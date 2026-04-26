@@ -30,7 +30,7 @@ PyJWT==2.12.1
 python-dotenv==1.2.2
 python-multipart==0.0.26
 python-slugify==8.0.4
-pywin32==311
+pywin32==311 ; sys_platform == "win32"
 referencing==0.37.0
 rich==15.0.0
 rpds-py==0.30.0
