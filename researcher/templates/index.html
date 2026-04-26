@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Researcher · Übersicht{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Recherche-Bibliothek</h1>
+  <p class="subtitle">Strukturierte IT-Sicherheits-Recherchen mit Quellen-Aktualitätsprüfung.</p>
+  {% if any_stale %}
+  <div class="banner banner-warn">
+    Mindestens ein Thema ist älter als {{ stale_days }} Tage. Bitte
+    <code>researcher refresh</code> ausführen.
+  </div>
+  {% endif %}
+  <div class="search-bar">
+    <input id="q" type="search" placeholder="Themen durchsuchen…" aria-label="Suche">
+  </div>
+</section>
+
+<section class="grid" id="topic-grid">
+  {% for t in topics %}
+  <article class="card {% if t.is_stale %}card-stale{% endif %}"
+           data-tags="{{ t.tags|join(' ') }}"
+           data-q="{{ t.question|lower }}">
+    <header class="card-header">
+      <h2><a href="topics/{{ t.slug }}.html">{{ t.question }}</a></h2>
+      <span class="badge {% if t.is_stale %}badge-stale{% else %}badge-fresh{% endif %}"
+            title="Zuletzt aktualisiert">
+        {{ t.last_refreshed_at|fmt_date }}
+      </span>
+    </header>
+    <ul class="tldr">
+      {% for b in t.tldr %}
+        {% if b.strip() %}<li>{{ b }}</li>{% endif %}
+      {% endfor %}
+    </ul>
+    <footer class="card-footer">
+      {% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+    </footer>
+  </article>
+  {% else %}
+  <p class="empty">Noch keine Recherchen. Starte mit
+    <code>researcher ask "Deine Frage"</code>.</p>
+  {% endfor %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const q = document.getElementById('q');
+  const grid = document.getElementById('topic-grid');
+  if (q && grid) {
+    q.addEventListener('input', () => {
+      const term = q.value.toLowerCase();
+      for (const card of grid.querySelectorAll('.card')) {
+        const hay = (card.dataset.q + ' ' + card.dataset.tags).toLowerCase();
+        card.style.display = hay.includes(term) ? '' : 'none';
+      }
+    });
+  }
+</script>
+{% endblock %}

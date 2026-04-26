@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% set asset_prefix = "../" %}
+{% block title %}{{ topic.question }} · Researcher{% endblock %}
+{% block content %}
+<article class="topic">
+  <nav class="breadcrumb"><a href="../index.html">← Übersicht</a></nav>
+
+  {% if topic.is_stale %}
+  <div class="banner banner-warn">
+    <strong>Veraltet:</strong> Letzter Refresh am
+    <strong>{{ topic.last_refreshed_at|fmt_date }}</strong>
+    (mehr als {{ stale_days }} Tage her). Bitte
+    <code>researcher refresh --topic {{ topic.slug }}</code> ausführen.
+  </div>
+  {% endif %}
+
+  <header class="topic-header">
+    <h1>{{ topic.question }}</h1>
+    <div class="meta">
+      <span class="badge {% if topic.is_stale %}badge-stale{% else %}badge-fresh{% endif %}">
+        Aktualisiert: {{ topic.last_refreshed_at|fmt_date }}
+      </span>
+      {% for tag in topic.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+    </div>
+  </header>
+
+  <section class="callout">
+    <h2>TL;DR</h2>
+    <ul>
+      {% for b in topic.tldr %}
+        {% if b.strip() %}<li>{{ b }}</li>{% endif %}
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="body">
+    {{ topic.body_md|markdown|safe }}
+  </section>
+
+  <section class="sources">
+    <h2>Quellen</h2>
+    <ol>
+      {% for s in sources %}
+      <li>
+        <a href="{{ s.url }}" rel="noopener noreferrer" target="_blank">
+          {{ s.title or s.url }}
+        </a>
+        <span class="source-meta">
+          abgerufen {{ s.fetched_at|fmt_date }}
+          {% if s.is_stale %}<span class="badge badge-stale">stale</span>{% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+</article>
+{% endblock %}

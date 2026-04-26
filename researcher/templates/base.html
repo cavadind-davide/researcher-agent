@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Researcher Agent{% endblock %}</title>
+  <link rel="stylesheet" href="{{ asset_prefix|default('') }}assets/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ asset_prefix|default('') }}index.html">
+      <span class="brand-logo">⚙</span>
+      <span class="brand-text">Researcher · IT-Security</span>
+    </a>
+    <nav>
+      <a href="{{ asset_prefix|default('') }}index.html">Übersicht</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <span>Generiert am {{ generated_at|default('—') }}</span>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

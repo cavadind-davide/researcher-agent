@@ -1,0 +1,23 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Roh-Cache (große HTML-Snapshots) bleibt lokal
+data/cache/
+# WAL/Journal/SHM, aber NICHT die DB selbst — die ist committed,
+# damit GitHub-Actions-Workflows Source-Frische zwischen Runs erhalten.
+data/researcher.sqlite-journal
+data/researcher.sqlite-wal
+data/researcher.sqlite-shm
+
+# Lokale Vorschau (für Pages-Deploy aus dem Workflow heraus generiert)
+dist/
+
+# uv / pip
+uv.lock
+*.egg-info/
+build/
