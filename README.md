@@ -58,6 +58,7 @@ researcher serve
 
 | Befehl                            | Zweck                                                                 |
 | --------------------------------- | --------------------------------------------------------------------- |
+| `ask "<Frage>"` *(Wrapper)*       | One-Shot: Recherche → Commit → Push → Pages-Deploy triggern.          |
 | `researcher ask "<Frage>"`        | Neue Recherche, schreibt Topic + Quellen in die DB, rendert HTML.      |
 | `researcher refresh`              | Prüft alle Quellen auf Aktualisierungen, re-recherchiert stale Topics. |
 | `researcher refresh --topic <slug>` | Nur dieses Topic.                                                     |
@@ -66,6 +67,23 @@ researcher serve
 | `researcher serve [--port 8000]`  | Lokale HTTP-Vorschau aus `dist/`.                                     |
 | `researcher render-only`          | Rendert nur HTML neu (ohne Netzwerkzugriff).                          |
 | `researcher doctor`               | Prüft Keys + Erreichbarkeit der Quellen.                              |
+
+### `ask.cmd` als globaler Befehl
+
+Aufruf direkt aus dem Projektordner: `ask "Deine Frage"`.
+Damit `ask` von **überall** funktioniert, einmalig den Projektpfad in den
+Windows-PATH aufnehmen — z. B. via PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "Path",
+  $env:Path + ";C:\Projects\Researcher-Agent",
+  "User"
+)
+```
+
+Neues Terminal öffnen → `ask "..."` ist jetzt von jedem Verzeichnis aus
+erreichbar.
 
 ## Wie funktioniert die Aktualitätsprüfung?
 
