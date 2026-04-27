@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -60,7 +61,10 @@ _JSON_FENCE = re.compile(r"```json\s*\n(?P<body>.*?)\n```", re.DOTALL | re.IGNOR
 def _extract_json(text: str) -> dict[str, Any]:
     m = _JSON_FENCE.search(text)
     if m:
-        return json.loads(m.group("body"))
+        try:
+            return json.loads(m.group("body"))
+        except json.JSONDecodeError:
+            pass  # Brace-Matching-Fallback versuchen
     # Fallback: erstes "{...}" Objekt
     start = text.find("{")
     end = text.rfind("}")
@@ -83,11 +87,25 @@ def _validate(payload: dict[str, Any]) -> None:
         raise ValueError("'sources' muss eine nicht-leere Liste sein")
 
 
+_MAX_RETRIES = 2
+
+
 def research(question: str, *, focus_urls: list[str] | None = None) -> dict[str, Any]:
     """Führe eine vollständige Recherche aus und gib das geparste Ergebnis zurück."""
-    text = asyncio.run(_run_agent(question, focus_urls=focus_urls))
-    payload = _extract_json(text)
-    _validate(payload)
-    payload["slug"] = make_slug(question)
-    payload["question"] = question
-    return payload
+    last_exc: Exception = ValueError("Keine Versuche durchgeführt")
+    for attempt in range(_MAX_RETRIES + 1):
+        if attempt:
+            print(
+                f"  ⚠ JSON-Parse-Fehler (Versuch {attempt}/{_MAX_RETRIES}): {last_exc} – wiederhole…",
+                file=sys.stderr,
+            )
+        text = asyncio.run(_run_agent(question, focus_urls=focus_urls))
+        try:
+            payload = _extract_json(text)
+            _validate(payload)
+            payload["slug"] = make_slug(question)
+            payload["question"] = question
+            return payload
+        except ValueError as exc:
+            last_exc = exc
+    raise last_exc
