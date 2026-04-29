@@ -7,9 +7,9 @@ rem
 rem  Verwendung:  ask "Deine Frage in Anfuehrungszeichen"
 rem
 rem  Was passiert (Reihenfolge):
-rem    1. researcher ask "..."          -> Recherche + lokale Render-Updates
-rem    2. git add + commit + push       -> DB landet im Repo
-rem    3. gh workflow run pages.yml     -> Live-Site wird neu deployt
+rem    1. researcher ask "..."             -> Recherche + lokale Render-Updates
+rem    2. git add + commit + pull --rebase + push   -> DB landet im Repo
+rem    3. gh workflow run pages.yml        -> Live-Site wird neu deployt
 rem
 rem  Funktioniert von ueberall - der Skript-Pfad wird automatisch ermittelt.
 rem ===========================================================================
@@ -42,14 +42,31 @@ git add data/researcher.sqlite
 git diff --cached --quiet
 if errorlevel 1 (
   git commit -m "ask: %~1"
-  git push
-  if errorlevel 1 (
-    echo [WARNUNG] Push fehlgeschlagen. DB ist lokal committed; bitte 'git push' manuell wiederholen.
-    popd
-    exit /b 0
-  )
 ) else (
   echo Keine DB-Aenderungen - ueberspringe Commit.
+  popd
+  exit /b 0
+)
+
+rem  Remote-Stand einholen, bevor wir pushen - der Pages/Freshness-CI
+rem  pusht eigene Commits auf data/researcher.sqlite und wuerde uns sonst rejecten.
+git pull --rebase --autostash origin main
+if errorlevel 1 (
+  echo.
+  echo [FEHLER] Rebase wegen Konflikt in data/researcher.sqlite abgebrochen.
+  echo   Der CI-Bot hat zwischenzeitlich Frische-Updates gepusht, die mit
+  echo   deiner neuen Recherche kollidieren. Bitte manuell aufloesen:
+  echo     git rebase --abort     ^&^&  rem zurueck zum sauberen Commit
+  echo     git pull               ^&^&  rem Merge starten
+  echo     # dann data/researcher.sqlite mergen ^(oder Claude bitten^)
+  git rebase --abort >nul 2>&1
+  popd
+  exit /b 1
+)
+
+git push
+if errorlevel 1 (
+  echo [WARNUNG] Push fehlgeschlagen. DB ist lokal committed; bitte 'git push' manuell wiederholen.
   popd
   exit /b 0
 )
