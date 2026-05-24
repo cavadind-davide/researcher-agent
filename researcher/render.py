@@ -154,7 +154,7 @@ def render_all() -> None:
     rendered_index = env.get_template("index.html").render(
         topics=topic_views,
         recent_digests=recent_digests,
-        has_archive=bool(archived_digests),
+        archived_digests=archived_digests,
         any_stale=any_stale,
         stale_days=STALE_DAYS,
         generated_at=generated_at,

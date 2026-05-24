@@ -15,35 +15,8 @@
   </div>
 </section>
 
-<section class="grid" id="topic-grid">
-  {% for t in topics %}
-  <article class="card {% if t.is_stale %}card-stale{% endif %}"
-           data-tags="{{ t.tags|join(' ') }}"
-           data-q="{{ t.question|lower }}">
-    <header class="card-header">
-      <h2><a href="topics/{{ t.slug }}.html">{{ t.question }}</a></h2>
-      <span class="badge {% if t.is_stale %}badge-stale{% else %}badge-fresh{% endif %}"
-            title="Zuletzt aktualisiert">
-        {{ t.last_refreshed_at|fmt_date }}
-      </span>
-    </header>
-    <ul class="tldr">
-      {% for b in t.tldr %}
-        {% if b.strip() %}<li>{{ b }}</li>{% endif %}
-      {% endfor %}
-    </ul>
-    <footer class="card-footer">
-      {% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
-    </footer>
-  </article>
-  {% else %}
-  <p class="empty">Noch keine Recherchen. Starte mit
-    <code>researcher ask "Deine Frage"</code>.</p>
-  {% endfor %}
-</section>
-
 <section class="briefings">
-  <h2 class="section-title">Wöchentliche Briefings</h2>
+  <h2 class="section-title">Aktuelle Wochen-Briefings</h2>
   <div class="grid">
     {% for d in recent_digests %}
     <article class="card">
@@ -59,10 +32,56 @@
     <p class="empty">Noch kein Briefing. Starte mit <code>researcher digest</code>.</p>
     {% endfor %}
   </div>
-  {% if has_archive %}
-  <p class="archive-link"><a href="archive.html">→ Ältere Briefings im Archiv</a></p>
-  {% endif %}
 </section>
+
+<section class="topics">
+  <h2 class="section-title">Recherchen</h2>
+  <div class="grid" id="topic-grid">
+    {% for t in topics %}
+    <article class="card {% if t.is_stale %}card-stale{% endif %}"
+             data-tags="{{ t.tags|join(' ') }}"
+             data-q="{{ t.question|lower }}">
+      <header class="card-header">
+        <h2><a href="topics/{{ t.slug }}.html">{{ t.question }}</a></h2>
+        <span class="badge {% if t.is_stale %}badge-stale{% else %}badge-fresh{% endif %}"
+              title="Zuletzt aktualisiert">
+          {{ t.last_refreshed_at|fmt_date }}
+        </span>
+      </header>
+      <ul class="tldr">
+        {% for b in t.tldr %}
+          {% if b.strip() %}<li>{{ b }}</li>{% endif %}
+        {% endfor %}
+      </ul>
+      <footer class="card-footer">
+        {% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+      </footer>
+    </article>
+    {% else %}
+    <p class="empty">Noch keine Recherchen. Starte mit
+      <code>researcher ask "Deine Frage"</code>.</p>
+    {% endfor %}
+  </div>
+</section>
+
+{% if archived_digests %}
+<section class="archive-briefings">
+  <details>
+    <summary class="section-title">Archiv · ältere Briefings ({{ archived_digests|length }})</summary>
+    <div class="grid">
+      {% for d in archived_digests %}
+      <article class="card">
+        <header class="card-header">
+          <h2><a href="weekly/{{ d.week }}.html">Security-Briefing · {{ d.label }}</a></h2>
+          <span class="badge">{{ d.item_count }} Einträge</span>
+        </header>
+      </article>
+      {% endfor %}
+    </div>
+    <p class="archive-link"><a href="archive.html">→ Vollständiges Archiv</a></p>
+  </details>
+</section>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

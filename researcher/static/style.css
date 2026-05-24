@@ -176,6 +176,9 @@ main { max-width: var(--max); margin: 0 auto; padding: 2rem; }
 }
 .archive-link { margin-top: 1rem; }
 .archive-link a { color: var(--accent); }
+.archive-briefings { margin-top: 2.5rem; }
+.archive-briefings summary { cursor: pointer; list-style: revert; }
+.archive-briefings summary:hover { color: #cfe1ff; }
 
 .digest-item {
   border-left: 4px solid var(--accent);

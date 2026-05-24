@@ -53,11 +53,16 @@ def test_render_all_writes_pages_and_splits_archive(temp_db, monkeypatch, tmp_pa
     render.render_all()
 
     index = (dist / "index.html").read_text(encoding="utf-8")
-    assert "Wöchentliche Briefings" in index
+    assert "Aktuelle Wochen-Briefings" in index
     assert f"weekly/{recent_week}.html" in index
     assert "Kritische RCE in Foo" in index
-    assert "Ältere Briefings im Archiv" in index  # has_archive
-    assert "2020-W01" not in index                # archivierte Woche nicht in der Übersicht
+    # Archiv erscheint nun (einklappbar) am Index-Ende ...
+    assert "weekly/2020-W01.html" in index
+    assert "Archiv" in index
+    # ... aber aktuelle Briefings stehen oben, das Archiv darunter.
+    assert index.index(f"weekly/{recent_week}.html") < index.index("weekly/2020-W01.html")
+    # und die Recherchen-Sektion liegt zwischen aktuellen Briefings und Archiv.
+    assert index.index('class="briefings"') < index.index('class="topics"') < index.index('class="archive-briefings"')
 
     weekly = (dist / "weekly" / f"{recent_week}.html").read_text(encoding="utf-8")
     assert "Betrifft Edge-Geräte." in weekly
