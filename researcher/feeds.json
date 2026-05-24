@@ -38,5 +38,10 @@
     "name": "NCSC UK",
     "url": "https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml",
     "category": "guidance"
+  },
+  {
+    "name": "Cisco Talos",
+    "url": "https://blog.talosintelligence.com/rss/",
+    "category": "threat-intel"
   }
 ]
