@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set asset_prefix = "../" %}
+{% block title %}Security-Briefing {{ digest.label }} · Researcher{% endblock %}
+{% block content %}
+<article class="digest">
+  <nav class="breadcrumb"><a href="../index.html">← Übersicht</a></nav>
+
+  <header class="topic-header">
+    <h1>Security-Briefing · {{ digest.label }}</h1>
+    <div class="meta">
+      <span class="badge badge-fresh">Erstellt: {{ digest.generated_at|fmt_date }}</span>
+      <span class="tag">{{ digest.item_count }} Einträge</span>
+    </div>
+  </header>
+
+  {% for item in digest['items'] %}
+  <section class="digest-item">
+    <h2>
+      <a href="{{ item.url }}" rel="noopener noreferrer" target="_blank">{{ item.title }}</a>
+    </h2>
+    <div class="digest-meta">
+      <span class="source-name">{{ item.source_name }}</span>
+      {% if item.published_at %}<span class="source-meta">{{ item.published_at|fmt_date }}</span>{% endif %}
+    </div>
+    {% if item.summary %}<p class="digest-summary">{{ item.summary }}</p>{% endif %}
+    {% if item.why_relevant %}
+    <p class="digest-why"><strong>Warum relevant:</strong> {{ item.why_relevant }}</p>
+    {% endif %}
+    {% if item.attention %}
+    <p class="digest-attention"><strong>Besondere Beachtung:</strong> {{ item.attention }}</p>
+    {% endif %}
+    <p class="digest-link">
+      <a href="{{ item.url }}" rel="noopener noreferrer" target="_blank">Quelle ansehen →</a>
+    </p>
+  </section>
+  {% else %}
+  <p class="empty">Diese Woche keine als relevant eingestuften Einträge.</p>
+  {% endfor %}
+</article>
+{% endblock %}

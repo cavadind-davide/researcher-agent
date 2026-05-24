@@ -41,6 +41,28 @@
     <code>researcher ask "Deine Frage"</code>.</p>
   {% endfor %}
 </section>
+
+<section class="briefings">
+  <h2 class="section-title">Wöchentliche Briefings</h2>
+  <div class="grid">
+    {% for d in recent_digests %}
+    <article class="card">
+      <header class="card-header">
+        <h2><a href="weekly/{{ d.week }}.html">Security-Briefing · {{ d.label }}</a></h2>
+        <span class="badge badge-fresh">{{ d.item_count }} Einträge</span>
+      </header>
+      <ul class="tldr">
+        {% for item in d['items'][:3] %}<li>{{ item.title }}</li>{% endfor %}
+      </ul>
+    </article>
+    {% else %}
+    <p class="empty">Noch kein Briefing. Starte mit <code>researcher digest</code>.</p>
+    {% endfor %}
+  </div>
+  {% if has_archive %}
+  <p class="archive-link"><a href="archive.html">→ Ältere Briefings im Archiv</a></p>
+  {% endif %}
+</section>
 {% endblock %}
 
 {% block scripts %}

@@ -20,25 +20,24 @@ from slugify import slugify
 from .mcp_config import allowed_tools, build_mcp_servers
 
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "system_prompt_de.md"
+DIGEST_PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "system_prompt_digest_de.md"
 
 
 def load_system_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
 
 
+def load_digest_prompt() -> str:
+    return DIGEST_PROMPT_PATH.read_text(encoding="utf-8")
+
+
 def make_slug(question: str, max_length: int = 70) -> str:
     return slugify(question, max_length=max_length, word_boundary=True, save_order=True)
 
 
-async def _run_agent(prompt: str, *, focus_urls: list[str] | None = None) -> str:
-    """Sendet ``prompt`` an den Agent und liefert den letzten Assistant-Text zurück."""
-    system_prompt = load_system_prompt()
-    if focus_urls:
-        focus_block = "\n".join(f"- {u}" for u in focus_urls)
-        system_prompt += (
-            "\n\n# Zusatz: Fokus-Quellen (vorrangig prüfen)\n" + focus_block
-        )
-
+async def _run_query(prompt: str, system_prompt: str) -> str:
+    """Sendet ``prompt`` mit gegebenem System-Prompt an den Agent und liefert den
+    letzten nicht-leeren Assistant-Text zurück."""
     options = ClaudeAgentOptions(
         system_prompt=system_prompt,
         mcp_servers=build_mcp_servers(),
@@ -54,6 +53,22 @@ async def _run_agent(prompt: str, *, focus_urls: list[str] | None = None) -> str
                 if isinstance(block, TextBlock) and block.text.strip():
                     final_text = block.text
     return final_text
+
+
+async def _run_agent(prompt: str, *, focus_urls: list[str] | None = None) -> str:
+    """Recherche-Lauf mit dem Frage-System-Prompt."""
+    system_prompt = load_system_prompt()
+    if focus_urls:
+        focus_block = "\n".join(f"- {u}" for u in focus_urls)
+        system_prompt += (
+            "\n\n# Zusatz: Fokus-Quellen (vorrangig prüfen)\n" + focus_block
+        )
+    return await _run_query(prompt, system_prompt)
+
+
+async def _run_digest_agent(candidates_block: str) -> str:
+    """Briefing-Lauf mit dem Digest-System-Prompt."""
+    return await _run_query(candidates_block, load_digest_prompt())
 
 
 _JSON_FENCE = re.compile(r"```json\s*\n(?P<body>.*?)\n```", re.DOTALL | re.IGNORECASE)
@@ -147,6 +162,73 @@ def research(question: str, *, focus_urls: list[str] | None = None) -> dict[str,
             payload["slug"] = make_slug(question)
             payload["question"] = question
             return payload
+        except ValueError as exc:
+            last_exc = exc
+    raise last_exc
+
+
+# --- Wöchentliches Briefing ----------------------------------------------
+
+_DIGEST_FIELDS = ("url", "title", "summary", "why_relevant", "attention")
+
+
+def _format_candidates(candidates: list[dict[str, Any]]) -> str:
+    lines = ["# Kandidaten dieser Woche", ""]
+    for i, c in enumerate(candidates, 1):
+        lines.append(f"## {i}. {c.get('title', '').strip()}")
+        lines.append(f"- Quelle: {c.get('source_name')} ({c.get('category')})")
+        lines.append(f"- URL: {c['url']}")
+        if c.get("published_at"):
+            lines.append(f"- Datum: {c['published_at']}")
+        if c.get("summary"):
+            lines.append(f"- Auszug: {c['summary']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _extract_items(text: str) -> list[dict[str, Any]]:
+    """Parse das JSON-Array der Digest-Items (mit ``json_repair``-Fallback)."""
+    m = _JSON_FENCE.search(text)
+    if m:
+        raw = m.group("body")
+    else:
+        start = text.find("[")
+        end = text.rfind("]")
+        if start == -1 or end == -1 or end <= start:
+            raise ValueError(
+                f"Kein JSON-Array in der Digest-Antwort. Beginnt mit: {text[:300]!r}"
+            )
+        raw = text[start : end + 1]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        data = repair_json(raw, return_objects=True)
+    if not isinstance(data, list):
+        raise ValueError(f"Digest-Antwort ist kein Array, sondern {type(data).__name__}")
+    return data
+
+
+def summarize_digest(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Lass den Agent die relevanten Kandidaten auswählen und je Item
+    ``{url, title, summary, why_relevant, attention}`` liefern. Ein leeres
+    Array (nichts Relevantes) ist ein gültiges Ergebnis."""
+    if not candidates:
+        return []
+    last_exc: Exception = ValueError("Keine Versuche durchgeführt")
+    for attempt in range(_MAX_RETRIES + 1):
+        if attempt:
+            print(
+                f"  ⚠ Digest-Parse-Fehler (Versuch {attempt}/{_MAX_RETRIES}): {last_exc} – wiederhole…",
+                file=sys.stderr,
+            )
+        text = asyncio.run(_run_digest_agent(_format_candidates(candidates)))
+        try:
+            items = _extract_items(text)
+            return [
+                {k: it.get(k) for k in _DIGEST_FIELDS}
+                for it in items
+                if isinstance(it, dict) and it.get("url")
+            ]
         except ValueError as exc:
             last_exc = exc
     raise last_exc

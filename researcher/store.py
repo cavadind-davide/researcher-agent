@@ -36,6 +36,33 @@ CREATE TABLE IF NOT EXISTS sources (
 
 CREATE INDEX IF NOT EXISTS idx_sources_topic ON sources(topic_id);
 CREATE INDEX IF NOT EXISTS idx_sources_url ON sources(url);
+
+CREATE TABLE IF NOT EXISTS digests (
+  id INTEGER PRIMARY KEY,
+  week TEXT UNIQUE NOT NULL,
+  created_at TEXT NOT NULL,
+  generated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS digest_items (
+  id INTEGER PRIMARY KEY,
+  digest_id INTEGER NOT NULL REFERENCES digests(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  source_name TEXT,
+  summary TEXT,
+  why_relevant TEXT,
+  attention TEXT,
+  published_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS seen_entries (
+  url TEXT PRIMARY KEY,
+  seen_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_digest_items_digest ON digest_items(digest_id);
 """
 
 
@@ -62,6 +89,28 @@ class Source:
     content_sha256: str | None
     fetched_at: str
     is_stale: bool
+
+
+@dataclass
+class Digest:
+    id: int
+    week: str
+    created_at: str
+    generated_at: str
+
+
+@dataclass
+class DigestItem:
+    id: int
+    digest_id: int
+    title: str
+    url: str
+    source_name: str | None
+    summary: str | None
+    why_relevant: str | None
+    attention: str | None
+    published_at: str | None
+    created_at: str
 
 
 def now_iso() -> str:
@@ -201,3 +250,85 @@ def topics_with_stale_sources() -> list[Topic]:
                ORDER BY t.last_refreshed_at"""
         ).fetchall()
     return [Topic(**dict(r)) for r in rows]
+
+
+# --- Wöchentliches Briefing (Digests) ------------------------------------
+
+def upsert_digest(week: str) -> int:
+    """Lege den Digest einer ISO-Woche an oder hole die bestehende id; aktualisiere generated_at."""
+    ts = now_iso()
+    with connect() as conn:
+        row = conn.execute("SELECT id FROM digests WHERE week = ?", (week,)).fetchone()
+        if row is None:
+            cur = conn.execute(
+                "INSERT INTO digests (week, created_at, generated_at) VALUES (?, ?, ?)",
+                (week, ts, ts),
+            )
+            return int(cur.lastrowid)
+        conn.execute("UPDATE digests SET generated_at = ? WHERE id = ?", (ts, row["id"]))
+        return int(row["id"])
+
+
+def replace_digest_items(digest_id: int, items: list[dict]) -> None:
+    """Ersetze alle Items eines Digests. Erwartet dicts mit
+    title, url, source_name, summary, why_relevant, attention, published_at."""
+    ts = now_iso()
+    with connect() as conn:
+        conn.execute("DELETE FROM digest_items WHERE digest_id = ?", (digest_id,))
+        for it in items:
+            conn.execute(
+                """INSERT INTO digest_items
+                   (digest_id, title, url, source_name, summary, why_relevant, attention, published_at, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    digest_id,
+                    it["title"],
+                    it["url"],
+                    it.get("source_name"),
+                    it.get("summary"),
+                    it.get("why_relevant"),
+                    it.get("attention"),
+                    it.get("published_at"),
+                    ts,
+                ),
+            )
+
+
+def list_digests() -> list[Digest]:
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM digests ORDER BY week DESC").fetchall()
+    return [Digest(**dict(r)) for r in rows]
+
+
+def get_digest(week: str) -> Digest | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM digests WHERE week = ?", (week,)).fetchone()
+    return Digest(**dict(row)) if row else None
+
+
+def get_digest_items(digest_id: int) -> list[DigestItem]:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM digest_items WHERE digest_id = ? ORDER BY id", (digest_id,)
+        ).fetchall()
+    return [DigestItem(**dict(r)) for r in rows]
+
+
+def mark_seen(urls: list[str]) -> None:
+    """Merke URLs als bereits verarbeitet (Dedup über Wochen hinweg)."""
+    ts = now_iso()
+    with connect() as conn:
+        for u in urls:
+            conn.execute(
+                "INSERT OR IGNORE INTO seen_entries (url, seen_at) VALUES (?, ?)", (u, ts)
+            )
+
+
+def filter_unseen(urls: list[str]) -> list[str]:
+    """Gib nur die URLs zurück, die noch nicht in ``seen_entries`` stehen (Reihenfolge bleibt erhalten)."""
+    if not urls:
+        return []
+    with connect() as conn:
+        rows = conn.execute("SELECT url FROM seen_entries").fetchall()
+    seen = {r["url"] for r in rows}
+    return [u for u in urls if u not in seen]

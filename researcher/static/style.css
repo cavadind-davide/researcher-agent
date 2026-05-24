@@ -165,3 +165,29 @@ main { max-width: var(--max); margin: 0 auto; padding: 2rem; }
 .sources ol { padding-left: 1.4rem; }
 .sources li { margin: 0.5rem 0; }
 .source-meta { color: var(--fg-dim); font-size: 0.8rem; margin-left: 0.5rem; }
+
+/* Wöchentliche Briefings */
+.section-title {
+  margin: 2.5rem 0 1rem;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #cfe1ff;
+}
+.archive-link { margin-top: 1rem; }
+.archive-link a { color: var(--accent); }
+
+.digest-item {
+  border-left: 4px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin: 1.2rem 0;
+}
+.digest-item h2 { margin: 0 0 0.4rem; font-size: 1.1rem; }
+.digest-meta { font-size: 0.8rem; color: var(--fg-dim); margin-bottom: 0.6rem; }
+.digest-meta .source-name { font-weight: 600; color: #cfe1ff; }
+.digest-summary { margin: 0.5rem 0; }
+.digest-why, .digest-attention { margin: 0.4rem 0; font-size: 0.95rem; }
+.digest-attention { color: #ffe1c2; }
+.digest-link { margin: 0.6rem 0 0; font-size: 0.85rem; }

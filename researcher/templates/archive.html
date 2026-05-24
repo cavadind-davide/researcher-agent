@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Briefing-Archiv · Researcher{% endblock %}
+{% block content %}
+<section class="hero">
+  <nav class="breadcrumb"><a href="index.html">← Übersicht</a></nav>
+  <h1>Briefing-Archiv</h1>
+  <p class="subtitle">Wöchentliche Security-Briefings, älter als {{ archive_days }} Tage.</p>
+</section>
+
+<section class="grid">
+  {% for d in digests %}
+  <article class="card">
+    <header class="card-header">
+      <h2><a href="weekly/{{ d.week }}.html">Security-Briefing · {{ d.label }}</a></h2>
+      <span class="badge">{{ d.item_count }} Einträge</span>
+    </header>
+    <ul class="tldr">
+      {% for item in d['items'][:3] %}<li>{{ item.title }}</li>{% endfor %}
+    </ul>
+  </article>
+  {% else %}
+  <p class="empty">Noch keine archivierten Briefings.</p>
+  {% endfor %}
+</section>
+{% endblock %}

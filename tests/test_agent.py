@@ -134,3 +134,81 @@ def test_research_raises_after_exhausting_retries(monkeypatch):
     with pytest.raises(ValueError):
         agent.research("Frage")
     assert fake.calls == agent._MAX_RETRIES + 1
+
+
+# --- Digest -------------------------------------------------------------
+
+DIGEST_OK = """```json
+[{"url": "https://a/1", "title": "T", "summary": "S", "why_relevant": "W", "attention": "AT", "extra": "ignored"}]
+```"""
+
+
+class _FakeDigestAgent:
+    def __init__(self, *responses: str):
+        self._responses = list(responses)
+        self.calls = 0
+
+    async def __call__(self, candidates_block):
+        idx = min(self.calls, len(self._responses) - 1)
+        self.calls += 1
+        return self._responses[idx]
+
+
+def test_extract_items_from_fence():
+    assert agent._extract_items('```json\n[{"url": "x"}]\n```') == [{"url": "x"}]
+
+
+def test_extract_items_bracket_fallback_and_repair():
+    assert agent._extract_items('Text [{"url": "x",}] Ende') == [{"url": "x"}]
+
+
+def test_extract_items_non_array_raises():
+    with pytest.raises(ValueError):
+        agent._extract_items('```json\n{"url": "x"}\n```')
+
+
+def test_extract_items_missing_raises():
+    with pytest.raises(ValueError):
+        agent._extract_items("gar kein array")
+
+
+def test_format_candidates_includes_url_and_title():
+    block = agent._format_candidates([
+        {"title": "Titel X", "url": "https://a/1", "source_name": "BSI", "category": "advisory", "summary": "Auszug"},
+    ])
+    assert "https://a/1" in block
+    assert "Titel X" in block
+    assert "BSI" in block
+
+
+def test_summarize_digest_empty_candidates_skips_agent(monkeypatch):
+    fake = _FakeDigestAgent(DIGEST_OK)
+    monkeypatch.setattr(agent, "_run_digest_agent", fake)
+    assert agent.summarize_digest([]) == []
+    assert fake.calls == 0
+
+
+def test_summarize_digest_normalizes_and_drops_extra_fields(monkeypatch):
+    monkeypatch.setattr(agent, "_run_digest_agent", _FakeDigestAgent(DIGEST_OK))
+    items = agent.summarize_digest([{"url": "https://a/1", "title": "x"}])
+    assert items == [{"url": "https://a/1", "title": "T", "summary": "S", "why_relevant": "W", "attention": "AT"}]
+
+
+def test_summarize_digest_empty_array_is_valid(monkeypatch):
+    monkeypatch.setattr(agent, "_run_digest_agent", _FakeDigestAgent("```json\n[]\n```"))
+    assert agent.summarize_digest([{"url": "https://a/1", "title": "x"}]) == []
+
+
+def test_summarize_digest_drops_items_without_url(monkeypatch):
+    resp = '```json\n[{"title": "ohne url"}, {"url": "https://a/2", "title": "ok"}]\n```'
+    monkeypatch.setattr(agent, "_run_digest_agent", _FakeDigestAgent(resp))
+    items = agent.summarize_digest([{"url": "https://a/2", "title": "x"}])
+    assert [i["url"] for i in items] == ["https://a/2"]
+
+
+def test_summarize_digest_retries_then_succeeds(monkeypatch):
+    fake = _FakeDigestAgent("kein array hier", DIGEST_OK)
+    monkeypatch.setattr(agent, "_run_digest_agent", fake)
+    items = agent.summarize_digest([{"url": "https://a/1", "title": "x"}])
+    assert fake.calls == 2
+    assert items[0]["url"] == "https://a/1"

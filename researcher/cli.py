@@ -13,7 +13,7 @@ import httpx
 import typer
 from dotenv import load_dotenv
 
-from . import agent, render, sources, store
+from . import agent, digest as digest_mod, render, sources, store
 
 ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
@@ -196,6 +196,23 @@ def refresh(
 
     render.render_all()
     typer.echo(f"✓ {len(targets)} Topic(s) aktualisiert.")
+
+
+@app.command()
+def digest() -> None:
+    """Scanne die kuratierten Security-Feeds und erstelle das Wochen-Briefing."""
+    store.init_db()
+    typer.echo("› Wöchentliches Security-Briefing – scanne Feeds …")
+    result = digest_mod.run_weekly_scan()
+    if result["candidates"] == 0:
+        typer.echo("✓ Keine neuen Feed-Einträge – kein Briefing erstellt.")
+    else:
+        typer.echo(
+            f"✓ Woche {result['week']}: {result['items']} Item(s) aus "
+            f"{result['candidates']} Kandidat(en)."
+        )
+    render.render_all()
+    typer.echo(f"✓ HTML aktualisiert in {render.DIST_DIR}")
 
 
 @app.command(name="list")

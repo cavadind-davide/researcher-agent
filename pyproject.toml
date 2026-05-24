@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "markdown-it-py>=3.0",
     "json-repair>=0.30",
+    "feedparser>=6.0",
 ]
 
 [project.optional-dependencies]

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import shutil
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -14,6 +14,7 @@ PKG_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = PKG_DIR.parent
 DIST_DIR = PROJECT_ROOT / "dist"
 STALE_DAYS = 21
+ARCHIVE_DAYS = 31  # Briefings älter als ~1 Monat wandern ins Archiv
 
 _md = MarkdownIt("commonmark", {"html": False, "linkify": True, "typographer": True}).enable("table")
 
@@ -51,6 +52,22 @@ def _is_stale(topic: store.Topic) -> bool:
     return _days_since(topic.last_refreshed_at) > STALE_DAYS
 
 
+def _week_monday(week: str) -> date:
+    """Montag der ISO-Woche ``YYYY-Www``."""
+    year_s, week_s = week.split("-W")
+    return datetime.fromisocalendar(int(year_s), int(week_s), 1).date()
+
+
+def _digest_is_recent(week: str, today: date) -> bool:
+    """True, solange die Woche höchstens ``ARCHIVE_DAYS`` Tage zurückliegt."""
+    return (today - _week_monday(week)).days <= ARCHIVE_DAYS
+
+
+def _digest_label(week: str) -> str:
+    year_s, week_s = week.split("-W")
+    return f"KW {int(week_s)} · {year_s}"
+
+
 def _split_tags(tags: str | None) -> list[str]:
     if not tags:
         return []
@@ -63,6 +80,36 @@ def _split_tldr(tldr: str | None) -> list[str]:
 
 def _ensure_dirs() -> None:
     (DIST_DIR / "topics").mkdir(parents=True, exist_ok=True)
+    (DIST_DIR / "weekly").mkdir(parents=True, exist_ok=True)
+
+
+def _digest_views() -> list[dict]:
+    today = datetime.now(timezone.utc).date()
+    views = []
+    for d in store.list_digests():
+        items = store.get_digest_items(d.id)
+        views.append(
+            {
+                "week": d.week,
+                "label": _digest_label(d.week),
+                "generated_at": d.generated_at,
+                "item_count": len(items),
+                "is_recent": _digest_is_recent(d.week, today),
+                "items": [
+                    {
+                        "title": it.title,
+                        "url": it.url,
+                        "source_name": it.source_name,
+                        "summary": it.summary,
+                        "why_relevant": it.why_relevant,
+                        "attention": it.attention,
+                        "published_at": it.published_at,
+                    }
+                    for it in items
+                ],
+            }
+        )
+    return views
 
 
 def _copy_static() -> None:
@@ -98,14 +145,33 @@ def render_all() -> None:
             }
         )
 
+    digest_views = _digest_views()
+    recent_digests = [v for v in digest_views if v["is_recent"]]
+    archived_digests = [v for v in digest_views if not v["is_recent"]]
+
     any_stale = any(v["is_stale"] for v in topic_views)
+    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     rendered_index = env.get_template("index.html").render(
         topics=topic_views,
+        recent_digests=recent_digests,
+        has_archive=bool(archived_digests),
         any_stale=any_stale,
         stale_days=STALE_DAYS,
-        generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        generated_at=generated_at,
     )
     (DIST_DIR / "index.html").write_text(rendered_index, encoding="utf-8")
+
+    weekly_tpl = env.get_template("weekly.html")
+    for d in digest_views:
+        rendered_week = weekly_tpl.render(digest=d, generated_at=generated_at)
+        (DIST_DIR / "weekly" / f"{d['week']}.html").write_text(rendered_week, encoding="utf-8")
+
+    rendered_archive = env.get_template("archive.html").render(
+        digests=archived_digests,
+        archive_days=ARCHIVE_DAYS,
+        generated_at=generated_at,
+    )
+    (DIST_DIR / "archive.html").write_text(rendered_archive, encoding="utf-8")
 
     topic_tpl = env.get_template("topic.html")
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")

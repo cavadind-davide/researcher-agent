@@ -60,3 +60,49 @@ def test_mark_topic_refreshed_clears_stale(temp_db):
     store.update_source_freshness(sid, etag=None, last_modified=None, content_sha256="h", is_stale=True)
     store.mark_topic_refreshed(tid)
     assert store.get_sources(tid)[0].is_stale is False
+
+
+# --- Digests --------------------------------------------------------------
+
+def test_upsert_digest_is_idempotent_per_week(temp_db):
+    d1 = store.upsert_digest("2026-W21")
+    d2 = store.upsert_digest("2026-W21")
+    assert d1 == d2
+    assert len(store.list_digests()) == 1
+
+
+def test_replace_and_get_digest_items(temp_db):
+    did = store.upsert_digest("2026-W21")
+    store.replace_digest_items(did, [
+        {
+            "title": "Kritische RCE in Foo", "url": "https://a/1", "source_name": "BSI",
+            "summary": "Zusammenfassung.", "why_relevant": "Betrifft Edge-Geräte.",
+            "attention": "Sofort patchen.", "published_at": "2026-05-20",
+        },
+        {"title": "Item ohne Extras", "url": "https://a/2"},
+    ])
+    items = store.get_digest_items(did)
+    assert [i.url for i in items] == ["https://a/1", "https://a/2"]
+    assert items[0].source_name == "BSI"
+    assert items[0].why_relevant == "Betrifft Edge-Geräte."
+    assert items[1].summary is None
+
+
+def test_replace_digest_items_overwrites(temp_db):
+    did = store.upsert_digest("2026-W21")
+    store.replace_digest_items(did, [{"title": "alt", "url": "https://a/1"}])
+    store.replace_digest_items(did, [{"title": "neu", "url": "https://a/2"}])
+    assert [i.url for i in store.get_digest_items(did)] == ["https://a/2"]
+
+
+def test_seen_entries_dedup(temp_db):
+    urls = ["https://a/1", "https://a/2", "https://a/3"]
+    assert store.filter_unseen(urls) == urls  # anfangs nichts gesehen
+    store.mark_seen(["https://a/1", "https://a/3"])
+    assert store.filter_unseen(urls) == ["https://a/2"]
+    store.mark_seen(["https://a/1"])  # erneut markieren ist idempotent
+    assert store.filter_unseen(urls) == ["https://a/2"]
+
+
+def test_filter_unseen_empty(temp_db):
+    assert store.filter_unseen([]) == []

@@ -44,6 +44,13 @@ jobs:
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
         run: researcher refresh
 
+      - name: Weekly security digest (Feeds scannen + Briefing erstellen)
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+        run: researcher digest
+
       - name: Commit aktualisierte DB (falls geaendert)
         run: |
           git config user.name "github-actions[bot]"
