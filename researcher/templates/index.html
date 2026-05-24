@@ -27,6 +27,13 @@
 </section>
 {% endif %}
 
+{% if repo %}
+<section class="actions">
+  <a class="btn" href="https://github.com/{{ repo }}/issues/new?template=ask.yml">+ Neue Frage stellen</a>
+  <a class="btn" href="https://github.com/{{ repo }}/issues/new?template=add-feed.yml">+ Feed vorschlagen</a>
+</section>
+{% endif %}
+
 <section class="briefings">
   <h2 class="section-title">Aktuelle Wochen-Briefings</h2>
   <div class="grid">
@@ -67,6 +74,7 @@
       </ul>
       <footer class="card-footer">
         {% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+        {% if repo %}<a class="card-action" href="https://github.com/{{ repo }}/issues/new?template=archive-topic.yml&slug={{ t.slug }}">archivieren</a>{% endif %}
       </footer>
     </article>
     {% else %}

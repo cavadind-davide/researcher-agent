@@ -113,3 +113,50 @@ def test_add_feed_duplicate_exits(tmp_path, monkeypatch):
     with pytest.raises(typer.Exit):
         cli.add_feed(url="https://a", name="A2")
     assert len(cli.feeds.load_feeds()) == 1
+
+
+# --- intake (GitHub-Issue-Dispatch) ---------------------------------------
+
+def test_intake_ask(temp_db, monkeypatch):
+    monkeypatch.setattr(
+        cli.sources, "baseline_urls",
+        lambda urls: [{"etag": None, "last_modified": None, "content_sha256": "h"} for _ in urls],
+    )
+    monkeypatch.setattr(cli.agent, "research", lambda q: {
+        "slug": "meine-frage", "question": q, "tldr": ["A"], "tags": ["iam"],
+        "body_md": "## H", "sources": [{"url": "https://ok.test", "title": "T"}],
+    })
+    monkeypatch.setenv("INTAKE_ACTION", "ask")
+    monkeypatch.setenv("ISSUE_BODY", "### Frage\n\nMeine Frage?")
+    cli.intake()
+    assert store.get_topic("meine-frage") is not None
+
+
+def test_intake_archive(temp_db, monkeypatch):
+    store.upsert_topic(slug="s1", question="Q", tldr="A", body_md="b", tags="")
+    monkeypatch.setenv("INTAKE_ACTION", "archive")
+    monkeypatch.setenv("ISSUE_BODY", "### Slug\n\ns1")
+    cli.intake()
+    assert store.get_topic("s1").archived is True
+
+
+def test_intake_add_feed(temp_db, tmp_path, monkeypatch):
+    p = tmp_path / "feeds.json"
+    p.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(cli.feeds, "FEEDS_PATH", p)
+    monkeypatch.setattr(cli.digest_mod, "validate_feed", lambda url: (True, "Feed"))
+    monkeypatch.setenv("INTAKE_ACTION", "add-feed")
+    monkeypatch.setenv(
+        "ISSUE_BODY",
+        "### Name\n\nTalos\n\n### URL\n\nhttps://talos.test/rss\n\n### Kategorie\n\nthreat-intel",
+    )
+    cli.intake()
+    feeds_now = cli.feeds.load_feeds()
+    assert feeds_now == [{"name": "Talos", "url": "https://talos.test/rss", "category": "threat-intel"}]
+
+
+def test_intake_unknown_action_exits(temp_db, monkeypatch):
+    monkeypatch.setenv("INTAKE_ACTION", "bogus")
+    monkeypatch.setenv("ISSUE_BODY", "")
+    with pytest.raises(typer.Exit):
+        cli.intake()

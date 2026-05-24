@@ -13,7 +13,7 @@ import httpx
 import typer
 from dotenv import load_dotenv
 
-from . import agent, digest as digest_mod, feeds, render, sources, store
+from . import agent, digest as digest_mod, feeds, intake as intake_mod, render, sources, store
 
 ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
@@ -261,6 +261,54 @@ def add_feed(
         raise typer.Exit(1)
     feeds.append_feed(name=name, url=url, category=category)
     typer.echo(f"✓ Feed ergänzt: {name} — {url}  (erkannt als: {info})")
+
+
+@app.command()
+def intake() -> None:
+    """Verarbeite einen GitHub-Issue-Intake. Liest ``INTAKE_ACTION`` und ``ISSUE_BODY``
+    aus der Umgebung (kein Shell-Interpolieren von Nutzereingaben) und führt die
+    Aktion aus. Rendern/Deploy übernimmt der Workflow."""
+    action = os.environ.get("INTAKE_ACTION", "").strip()
+    fields = intake_mod.parse_issue_form(os.environ.get("ISSUE_BODY", ""))
+    store.init_db()
+
+    if action == "ask":
+        question = (fields.get("Frage") or "").strip()
+        if not question:
+            typer.secho("Keine Frage angegeben.", fg="red", err=True)
+            raise typer.Exit(1)
+        payload = agent.research(question)
+        _persist(payload)
+        typer.echo("RESULT: Recherche gespeichert.")
+        typer.echo(f"SLUG: {payload['slug']}")
+    elif action == "archive":
+        slug = (fields.get("Slug") or "").strip()
+        if not slug:
+            typer.secho("Kein Slug angegeben.", fg="red", err=True)
+            raise typer.Exit(1)
+        if not store.set_topic_archived(slug, True):
+            typer.secho(f"Topic '{slug}' nicht gefunden.", fg="red", err=True)
+            raise typer.Exit(1)
+        typer.echo(f"RESULT: Topic '{slug}' archiviert.")
+    elif action == "add-feed":
+        url = (fields.get("URL") or "").strip()
+        name = (fields.get("Name") or "").strip()
+        category = (fields.get("Kategorie") or "").strip()
+        if not name or not _is_safe_url(url):
+            typer.secho(f"Name fehlt oder ungültige URL: {url!r}", fg="red", err=True)
+            raise typer.Exit(1)
+        if feeds.feed_exists(url):
+            typer.echo(f"RESULT: Feed bereits vorhanden ({url}).")
+            return
+        ok, info = digest_mod.validate_feed(url)
+        if not ok:
+            typer.secho(f"Feed nicht valide: {info}", fg="red", err=True)
+            raise typer.Exit(1)
+        feeds.append_feed(name=name, url=url, category=category)
+        typer.echo(f"RESULT: Feed '{name}' ergänzt ({info}).")
+    else:
+        typer.secho(f"Unbekannte Intake-Aktion: {action!r}", fg="red", err=True)
+        raise typer.Exit(1)
 
 
 @app.command(name="list")

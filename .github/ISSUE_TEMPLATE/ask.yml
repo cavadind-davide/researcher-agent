@@ -1,0 +1,13 @@
+name: Neue Recherche-Frage
+description: Stelle dem Researcher-Agent eine neue Frage (löst Recherche + Deploy aus). Nur für den Repo-Owner.
+title: "[Ask] Neue Recherche-Frage"
+labels: ["intake:ask"]
+body:
+  - type: textarea
+    id: frage
+    attributes:
+      label: Frage
+      description: Die Recherche-Frage auf Deutsch.
+      placeholder: "Wie härte ich Microsoft Entra ID gegen Token-Replay?"
+    validations:
+      required: true

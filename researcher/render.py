@@ -1,6 +1,7 @@
 """Rendert die SQLite-Daten als statische Webseite ins ``dist/``-Verzeichnis."""
 from __future__ import annotations
 
+import os
 import shutil
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -15,6 +16,8 @@ PROJECT_ROOT = PKG_DIR.parent
 DIST_DIR = PROJECT_ROOT / "dist"
 STALE_DAYS = 21
 ARCHIVE_DAYS = 31  # Briefings älter als ~1 Monat wandern ins Archiv
+# Für die Intake-Buttons (Issue-Form-Links); in CI aus GITHUB_REPOSITORY.
+REPO_SLUG = os.environ.get("GITHUB_REPOSITORY", "cavadind-davide/researcher-agent")
 
 _md = MarkdownIt("commonmark", {"html": False, "linkify": True, "typographer": True}).enable("table")
 
@@ -169,6 +172,7 @@ def render_all() -> None:
         any_stale=any_stale,
         stale_days=STALE_DAYS,
         generated_at=generated_at,
+        repo=REPO_SLUG,
     )
     (DIST_DIR / "index.html").write_text(rendered_index, encoding="utf-8")
 

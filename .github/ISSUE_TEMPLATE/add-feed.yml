@@ -1,0 +1,28 @@
+name: Feed vorschlagen
+description: Schlage einen RSS/Atom-Feed fürs Wochen-Briefing vor (wird vor Aufnahme validiert). Nur für den Repo-Owner.
+title: "[Feed] Neuer Feed-Kanal"
+labels: ["intake:add-feed"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: Anzeigename der Quelle.
+      placeholder: "Cisco Talos"
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: URL
+      description: Die RSS/Atom-Feed-URL (https).
+      placeholder: "https://blog.talosintelligence.com/rss/"
+    validations:
+      required: true
+  - type: input
+    id: kategorie
+    attributes:
+      label: Kategorie
+      description: "Optional, z. B.: advisory, news, threat-intel, research, vendor, guidance."
+    validations:
+      required: false

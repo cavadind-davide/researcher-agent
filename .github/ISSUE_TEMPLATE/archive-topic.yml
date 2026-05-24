@@ -1,0 +1,13 @@
+name: Recherche archivieren
+description: Verschiebe eine Recherche ins Archiv (keine Frische-Prüfung mehr). Nur für den Repo-Owner.
+title: "[Archive] Recherche archivieren"
+labels: ["intake:archive"]
+body:
+  - type: input
+    id: slug
+    attributes:
+      label: Slug
+      description: Der Slug des Topics (steht in der URL der Topic-Seite, z. B. .../topics/<slug>.html).
+      placeholder: "wie-harte-ich-microsoft-entra-id-conditional-access-gegen-session"
+    validations:
+      required: true
