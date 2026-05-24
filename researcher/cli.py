@@ -113,6 +113,14 @@ def refresh(
     force: Annotated[
         bool, typer.Option("--force", help="Re-Recherche unabhängig vom Stale-Status.")
     ] = False,
+    rebaseline: Annotated[
+        bool,
+        typer.Option(
+            "--rebaseline",
+            help="Nur Quellen-Baseline (ETag/Last-Modified/Hash) neu setzen, keine Re-Recherche. "
+            "Einmalig nach einem Wechsel des Frische-Hash-Algorithmus nutzen.",
+        ),
+    ] = False,
 ) -> None:
     """Prüfe Quellen auf Aktualisierungen und re-recherchiere veränderte Topics."""
     store.init_db()
@@ -128,6 +136,26 @@ def refresh(
 
     if not topics:
         typer.echo("Keine Topics vorhanden. Starte mit `researcher ask \"…\"`.")
+        return
+
+    if rebaseline:
+        total = 0
+        for t in topics:
+            srcs = store.get_sources(t.id)
+            if not srcs:
+                continue
+            metas = sources.baseline_urls([s.url for s in srcs])
+            for s, meta in zip(srcs, metas):
+                store.update_source_freshness(
+                    s.id,
+                    etag=meta["etag"],
+                    last_modified=meta["last_modified"],
+                    content_sha256=meta["content_sha256"],
+                    is_stale=False,
+                )
+                total += 1
+        typer.echo(f"✓ Baseline für {total} Quelle(n) neu gesetzt – keine Re-Recherche.")
+        render.render_all()
         return
 
     stale_topic_ids: set[int] = set()
