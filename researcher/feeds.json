@@ -43,5 +43,10 @@
     "name": "Cisco Talos",
     "url": "https://blog.talosintelligence.com/rss/",
     "category": "threat-intel"
+  },
+  {
+    "name": "BleepingComputer",
+    "url": "https://www.bleepingcomputer.com/feed/",
+    "category": ""
   }
 ]
