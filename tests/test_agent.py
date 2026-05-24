@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+from claude_agent_sdk import CLINotFoundError, ProcessError
 
 from researcher import agent
 
@@ -134,6 +135,55 @@ def test_research_raises_after_exhausting_retries(monkeypatch):
     with pytest.raises(ValueError):
         agent.research("Frage")
     assert fake.calls == agent._MAX_RETRIES + 1
+
+
+class _RaisingThenOk:
+    """Wirft beim ersten Aufruf ``exc``, danach liefert es ``text``."""
+
+    def __init__(self, exc: Exception, text: str):
+        self.exc = exc
+        self.text = text
+        self.calls = 0
+
+    async def __call__(self, *args, **kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            raise self.exc
+        return self.text
+
+
+class _AlwaysRaises:
+    def __init__(self, exc: Exception):
+        self.exc = exc
+        self.calls = 0
+
+    async def __call__(self, *args, **kwargs):
+        self.calls += 1
+        raise self.exc
+
+
+def test_research_retries_on_transient_process_error(monkeypatch):
+    fake = _RaisingThenOk(ProcessError("nativer Crash", exit_code=3221225477), VALID)
+    monkeypatch.setattr(agent, "_run_agent", fake)
+    payload = agent.research("Frage")
+    assert fake.calls == 2
+    assert payload["tldr"] == ["Kernaussage A"]
+
+
+def test_research_does_not_retry_cli_not_found(monkeypatch):
+    fake = _AlwaysRaises(CLINotFoundError("Claude Code nicht gefunden"))
+    monkeypatch.setattr(agent, "_run_agent", fake)
+    with pytest.raises(CLINotFoundError):
+        agent.research("Frage")
+    assert fake.calls == 1  # kein Retry bei Konfigurationsfehler
+
+
+def test_summarize_digest_retries_on_process_error(monkeypatch):
+    fake = _RaisingThenOk(ProcessError("nativer Crash", exit_code=1), DIGEST_OK)
+    monkeypatch.setattr(agent, "_run_digest_agent", fake)
+    items = agent.summarize_digest([{"url": "https://a/1", "title": "x"}])
+    assert fake.calls == 2
+    assert items[0]["url"] == "https://a/1"
 
 
 # --- Digest -------------------------------------------------------------

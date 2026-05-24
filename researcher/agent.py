@@ -11,6 +11,9 @@ from typing import Any
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    CLIConnectionError,
+    CLINotFoundError,
+    ProcessError,
     TextBlock,
     query,
 )
@@ -160,6 +163,10 @@ def _validate(payload: dict[str, Any]) -> None:
 
 
 _MAX_RETRIES = 2
+# Wiederholbare Fehler: kaputtes/unvollständiges JSON (ValueError) sowie transiente
+# Subprozess-/Verbindungsfehler des Agent-SDK (z. B. ProcessError mit nativem Crash).
+# CLINotFoundError ist NICHT transient (Konfigurationsfehler) und wird durchgereicht.
+_RETRYABLE_ERRORS = (ValueError, ProcessError, CLIConnectionError)
 
 
 def research(question: str, *, focus_urls: list[str] | None = None) -> dict[str, Any]:
@@ -168,17 +175,19 @@ def research(question: str, *, focus_urls: list[str] | None = None) -> dict[str,
     for attempt in range(_MAX_RETRIES + 1):
         if attempt:
             print(
-                f"  ⚠ JSON-Parse-Fehler (Versuch {attempt}/{_MAX_RETRIES}): {last_exc} – wiederhole…",
+                f"  ⚠ Recherche-Fehler (Versuch {attempt}/{_MAX_RETRIES}): {last_exc} – wiederhole…",
                 file=sys.stderr,
             )
-        text = asyncio.run(_run_agent(question, focus_urls=focus_urls))
         try:
+            text = asyncio.run(_run_agent(question, focus_urls=focus_urls))
             payload = _parse_response(text)
             _validate(payload)
             payload["slug"] = make_slug(question)
             payload["question"] = question
             return payload
-        except ValueError as exc:
+        except CLINotFoundError:
+            raise
+        except _RETRYABLE_ERRORS as exc:
             last_exc = exc
     raise last_exc
 
@@ -234,17 +243,19 @@ def summarize_digest(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for attempt in range(_MAX_RETRIES + 1):
         if attempt:
             print(
-                f"  ⚠ Digest-Parse-Fehler (Versuch {attempt}/{_MAX_RETRIES}): {last_exc} – wiederhole…",
+                f"  ⚠ Digest-Fehler (Versuch {attempt}/{_MAX_RETRIES}): {last_exc} – wiederhole…",
                 file=sys.stderr,
             )
-        text = asyncio.run(_run_digest_agent(_format_candidates(candidates)))
         try:
+            text = asyncio.run(_run_digest_agent(_format_candidates(candidates)))
             items = _extract_items(text)
             return [
                 {k: it.get(k) for k in _DIGEST_FIELDS}
                 for it in items
                 if isinstance(it, dict) and it.get("url")
             ]
-        except ValueError as exc:
+        except CLINotFoundError:
+            raise
+        except _RETRYABLE_ERRORS as exc:
             last_exc = exc
     raise last_exc
