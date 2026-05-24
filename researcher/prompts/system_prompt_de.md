@@ -25,7 +25,9 @@ Hersteller-Marketing oder Drittanbieter-Blogs nur, wenn keine Primär­quelle ve
 
 # Output-Format (strikt)
 
-Antworte als ein einzelner JSON-Block in einem Markdown-Codefence ```json … ``` mit exakt diesem Schema:
+Antworte in **genau zwei Teilen**, in dieser Reihenfolge. **Wichtig:** Der Fließtext gehört NICHT ins JSON, sondern ausschließlich in Teil 2 — so entfällt jegliches JSON-Escaping für den langen Text.
+
+**Teil 1 — Metadaten als JSON** in einem Markdown-Codefence ```json … ``` mit exakt diesem Schema (ohne `body_md`!):
 
 ```json
 {
@@ -35,7 +37,6 @@ Antworte als ein einzelner JSON-Block in einem Markdown-Codefence ```json … ``
     "Bullet 3 — eine prägnante Kernaussage."
   ],
   "tags": ["iam", "zero-trust", "azure"],
-  "body_md": "## Risiken & Bedrohungen\n…\n\n## Empfehlungen (priorisiert)\n1. …\n2. …\n\n## Annahmen & offene Punkte\n…",
   "sources": [
     {"url": "https://…", "title": "Microsoft Learn — Conditional Access overview"},
     {"url": "https://…", "title": "NIST SP 800-207 Zero Trust Architecture"}
@@ -43,7 +44,15 @@ Antworte als ein einzelner JSON-Block in einem Markdown-Codefence ```json … ``
 }
 ```
 
-## Regeln für `body_md`
+**Teil 2 — der Fließtext als rohes Markdown**, eingeleitet durch eine eigene Zeile mit exakt diesem Marker:
+
+```
+===BODY_MD===
+```
+
+Danach folgt der vollständige Markdown-Text **roh** — kein Codefence drumherum, kein JSON, kein Escaping. Anführungszeichen, Zeilenumbrüche, Listen und Inline-Code dürfen frei verwendet werden.
+
+## Regeln für den Markdown-Body (Teil 2, nach `===BODY_MD===`)
 
 - Markdown, keine HTML-Tags.
 - Klare H2-Abschnitte: **Risiken & Bedrohungen**, **Empfehlungen (priorisiert)**, **Annahmen & offene Punkte**.
@@ -63,4 +72,4 @@ Antworte als ein einzelner JSON-Block in einem Markdown-Codefence ```json … ``
 
 # Schluss
 
-Gib ausschließlich den JSON-Block zurück, keinen weiteren Fließtext davor oder dahinter.
+Gib ausschließlich die beiden Teile zurück: zuerst den ```json-Block, dann die Marker-Zeile `===BODY_MD===`, dann den rohen Markdown-Text. Kein weiterer Text davor, dazwischen oder dahinter.

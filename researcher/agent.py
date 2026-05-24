@@ -14,6 +14,7 @@ from claude_agent_sdk import (
     TextBlock,
     query,
 )
+from json_repair import repair_json
 from slugify import slugify
 
 from .mcp_config import allowed_tools, build_mcp_servers
@@ -56,24 +57,64 @@ async def _run_agent(prompt: str, *, focus_urls: list[str] | None = None) -> str
 
 
 _JSON_FENCE = re.compile(r"```json\s*\n(?P<body>.*?)\n```", re.DOTALL | re.IGNORECASE)
+# Trennt Metadaten-JSON (Teil 1) vom rohen Markdown-Body (Teil 2). Toleriert
+# Schreibweisen wie "=== BODY_MD ===", zusätzliche "=" und Groß-/Kleinschreibung.
+_BODY_SENTINEL = re.compile(r"\n?[ \t]*={3,}\s*BODY_MD\s*={3,}[ \t]*\n?", re.IGNORECASE)
+# Optionaler umschließender Codefence um den Body (```markdown … ```), den wir abstreifen.
+_WRAP_FENCE = re.compile(r"\A```[\w-]*\n(?P<body>.*?)\n```\Z", re.DOTALL)
 
 
-def _extract_json(text: str) -> dict[str, Any]:
-    m = _JSON_FENCE.search(text)
+def _loads_lenient(raw: str) -> dict[str, Any]:
+    """Parse JSON, fall back to ``json_repair`` for typische LLM-Macken
+    (trailing commas, smart quotes, fehlende Klammern)."""
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        repaired = repair_json(raw, return_objects=True)
+        if not isinstance(repaired, dict):
+            raise ValueError(
+                f"json_repair lieferte {type(repaired).__name__}, erwartet dict"
+            )
+        return repaired
+
+
+def _extract_meta_json(segment: str) -> dict[str, Any]:
+    """Hole das Metadaten-JSON (tldr/tags/sources) aus dem Antwort-Kopf."""
+    m = _JSON_FENCE.search(segment)
     if m:
-        try:
-            return json.loads(m.group("body"))
-        except json.JSONDecodeError:
-            pass  # Brace-Matching-Fallback versuchen
-    # Fallback: erstes "{...}" Objekt
-    start = text.find("{")
-    end = text.rfind("}")
+        return _loads_lenient(m.group("body"))
+    start = segment.find("{")
+    end = segment.rfind("}")
     if start == -1 or end == -1 or end <= start:
         raise ValueError(
-            "Konnte kein JSON in der Agent-Antwort finden. "
-            f"Antwort beginnt mit: {text[:300]!r}"
+            "Konnte kein Metadaten-JSON in der Agent-Antwort finden. "
+            f"Kopf beginnt mit: {segment[:300]!r}"
         )
-    return json.loads(text[start : end + 1])
+    return _loads_lenient(segment[start : end + 1])
+
+
+def _parse_response(text: str) -> dict[str, Any]:
+    """Zerlege die zweiteilige Agent-Antwort: Metadaten-JSON + roher Markdown-Body.
+
+    Der Body steht hinter ``BODY_MD``-Sentinel und braucht daher kein
+    JSON-Escaping – das war die Hauptquelle der JSONDecodeErrors.
+    """
+    parts = _BODY_SENTINEL.split(text, maxsplit=1)
+    if len(parts) != 2:
+        raise ValueError(
+            "BODY_MD-Sentinel fehlt in der Agent-Antwort. "
+            f"Antwort endet mit: {text[-300:]!r}"
+        )
+    head, body = parts
+    payload = _extract_meta_json(head)
+    body = body.strip()
+    wrap = _WRAP_FENCE.match(body)
+    if wrap:
+        body = wrap.group("body").strip()
+    if not body:
+        raise ValueError("Markdown-Body hinter BODY_MD-Sentinel ist leer")
+    payload["body_md"] = body
+    return payload
 
 
 def _validate(payload: dict[str, Any]) -> None:
@@ -101,7 +142,7 @@ def research(question: str, *, focus_urls: list[str] | None = None) -> dict[str,
             )
         text = asyncio.run(_run_agent(question, focus_urls=focus_urls))
         try:
-            payload = _extract_json(text)
+            payload = _parse_response(text)
             _validate(payload)
             payload["slug"] = make_slug(question)
             payload["question"] = question
