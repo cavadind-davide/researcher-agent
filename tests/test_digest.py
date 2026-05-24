@@ -99,7 +99,7 @@ def test_run_weekly_scan_persists_and_dedups(temp_db, monkeypatch):
         digest.FeedEntry("BSI", "advisory", "Titel A", "https://a/1", datetime(2026, 5, 20, tzinfo=UTC), "exA"),
         digest.FeedEntry("Heise", "news", "Titel B", "https://a/2", None, "exB"),
     ]
-    monkeypatch.setattr(digest, "collect_entries", lambda *, now=None: entries)
+    monkeypatch.setattr(digest, "collect_entries", lambda *, now=None, force=False: entries)
 
     def fake_summarize(candidates):
         # Agent wählt a/1 und liefert zusätzlich eine halluzinierte URL (muss verworfen werden).
@@ -125,8 +125,26 @@ def test_run_weekly_scan_persists_and_dedups(temp_db, monkeypatch):
     assert store.filter_unseen(["https://a/1", "https://a/2"]) == []
 
 
+def test_collect_entries_force_ignores_seen(temp_db, monkeypatch):
+    now = datetime(2026, 5, 21, tzinfo=UTC)
+    e1 = digest.FeedEntry("S", "c", "T1", "https://a/1", now, "x")
+    e2 = digest.FeedEntry("S", "c", "T2", "https://a/2", now, "x")
+
+    async def fake_fetch_all(feeds):
+        return [[e1, e2]]
+
+    monkeypatch.setattr(digest, "_fetch_all", fake_fetch_all)
+    monkeypatch.setattr(digest, "load_feeds", lambda: [{"name": "S", "url": "x"}])
+    store.mark_seen(["https://a/1"])
+
+    # ohne force: gesehene URL gefiltert
+    assert [e.url for e in digest.collect_entries(now=now)] == ["https://a/2"]
+    # mit force: beide Kandidaten
+    assert sorted(e.url for e in digest.collect_entries(now=now, force=True)) == ["https://a/1", "https://a/2"]
+
+
 def test_run_weekly_scan_no_entries(temp_db, monkeypatch):
-    monkeypatch.setattr(digest, "collect_entries", lambda *, now=None: [])
+    monkeypatch.setattr(digest, "collect_entries", lambda *, now=None, force=False: [])
     now = datetime(2026, 5, 21, tzinfo=UTC)
     result = digest.run_weekly_scan(now=now)
     assert result == {"week": digest.current_week(now), "candidates": 0, "items": 0}

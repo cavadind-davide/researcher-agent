@@ -199,11 +199,16 @@ def refresh(
 
 
 @app.command()
-def digest() -> None:
+def digest(
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Aktuelle Kandidaten erneut verarbeiten (ignoriert bereits gesehene URLs)."),
+    ] = False,
+) -> None:
     """Scanne die kuratierten Security-Feeds und erstelle das Wochen-Briefing."""
     store.init_db()
     typer.echo("› Wöchentliches Security-Briefing – scanne Feeds …")
-    result = digest_mod.run_weekly_scan()
+    result = digest_mod.run_weekly_scan(force=force)
     if result["candidates"] == 0:
         typer.echo("✓ Keine neuen Feed-Einträge – kein Briefing erstellt.")
     else:

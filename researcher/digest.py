@@ -129,14 +129,17 @@ async def _fetch_all(feeds: list[dict]) -> list[list[FeedEntry]]:
         return await asyncio.gather(*(bounded(f) for f in feeds))
 
 
-def collect_entries(*, now: datetime | None = None) -> list[FeedEntry]:
-    """Hole alle Feeds, behalte neue Einträge im Zeitfenster (pro Feed begrenzt)
-    und filtere bereits gesehene URLs heraus."""
+def collect_entries(*, now: datetime | None = None, force: bool = False) -> list[FeedEntry]:
+    """Hole alle Feeds, behalte neue Einträge im Zeitfenster (pro Feed begrenzt).
+    Ohne ``force`` werden bereits gesehene URLs herausgefiltert; mit ``force``
+    werden die aktuellen Kandidaten erneut verarbeitet (z. B. nach Prompt-Änderungen)."""
     cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=WINDOW_DAYS)
     per_feed = asyncio.run(_fetch_all(load_feeds()))
     collected: list[FeedEntry] = []
     for entries in per_feed:
         collected.extend(_select_recent(entries, cutoff, MAX_PER_FEED))
+    if force:
+        return collected
     unseen = set(store.filter_unseen([e.url for e in collected]))
     return [e for e in collected if e.url in unseen]
 
@@ -165,11 +168,12 @@ def _enrich(items: list[dict], by_url: dict[str, FeedEntry]) -> list[dict]:
     return enriched
 
 
-def run_weekly_scan(*, now: datetime | None = None) -> dict:
+def run_weekly_scan(*, now: datetime | None = None, force: bool = False) -> dict:
     """Vollständiger Wochenlauf. Gibt eine kleine Zusammenfassung
-    ``{week, candidates, items}`` zurück."""
+    ``{week, candidates, items}`` zurück. ``force`` verarbeitet die aktuellen
+    Kandidaten erneut (ignoriert ``seen_entries``)."""
     week = current_week(now)
-    entries = collect_entries(now=now)
+    entries = collect_entries(now=now, force=force)
     if not entries:
         return {"week": week, "candidates": 0, "items": 0}
 
