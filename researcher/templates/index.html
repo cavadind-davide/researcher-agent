@@ -44,7 +44,7 @@
         <span class="badge badge-fresh">{{ d.item_count }} Einträge</span>
       </header>
       <ul class="tldr">
-        {% for item in d['items'][:3] %}<li>{{ item.title }}</li>{% endfor %}
+        {% for item in d['items'][:3] %}<li>{% if item.severity %}<span class="sev sev-{{ item.severity }}">{{ item.severity }}</span> {% endif %}{{ item.title }}</li>{% endfor %}
       </ul>
     </article>
     {% else %}

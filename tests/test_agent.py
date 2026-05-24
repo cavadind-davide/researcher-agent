@@ -189,7 +189,7 @@ def test_summarize_digest_retries_on_process_error(monkeypatch):
 # --- Digest -------------------------------------------------------------
 
 DIGEST_OK = """```json
-[{"url": "https://a/1", "title": "T", "summary": "S", "why_relevant": "W", "attention": "AT", "extra": "ignored"}]
+[{"url": "https://a/1", "title": "T", "summary": "S", "why_relevant": "W", "attention": "AT", "severity": "kritisch", "extra": "ignored"}]
 ```"""
 
 
@@ -241,7 +241,10 @@ def test_summarize_digest_empty_candidates_skips_agent(monkeypatch):
 def test_summarize_digest_normalizes_and_drops_extra_fields(monkeypatch):
     monkeypatch.setattr(agent, "_run_digest_agent", _FakeDigestAgent(DIGEST_OK))
     items = agent.summarize_digest([{"url": "https://a/1", "title": "x"}])
-    assert items == [{"url": "https://a/1", "title": "T", "summary": "S", "why_relevant": "W", "attention": "AT"}]
+    assert items == [{
+        "url": "https://a/1", "title": "T", "summary": "S",
+        "why_relevant": "W", "attention": "AT", "severity": "kritisch",
+    }]
 
 
 def test_summarize_digest_empty_array_is_valid(monkeypatch):

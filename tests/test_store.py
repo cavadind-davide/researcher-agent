@@ -95,6 +95,40 @@ def test_replace_digest_items_overwrites(temp_db):
     assert [i.url for i in store.get_digest_items(did)] == ["https://a/2"]
 
 
+def test_digest_item_severity_roundtrip(temp_db):
+    did = store.upsert_digest("2026-W30")
+    store.replace_digest_items(did, [
+        {"title": "Krit. RCE", "url": "https://a/1", "severity": "aktiv-ausgenutzt"},
+        {"title": "ohne severity", "url": "https://a/2"},
+    ])
+    items = store.get_digest_items(did)
+    assert items[0].severity == "aktiv-ausgenutzt"
+    assert items[1].severity is None
+
+
+def test_migration_adds_severity_to_old_digest_items(tmp_path):
+    import sqlite3
+    db = tmp_path / "old.sqlite"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        """CREATE TABLE digests (id INTEGER PRIMARY KEY, week TEXT UNIQUE NOT NULL,
+             created_at TEXT NOT NULL, generated_at TEXT NOT NULL);
+           CREATE TABLE digest_items (id INTEGER PRIMARY KEY, digest_id INTEGER NOT NULL,
+             title TEXT NOT NULL, url TEXT NOT NULL, source_name TEXT, summary TEXT,
+             why_relevant TEXT, attention TEXT, published_at TEXT, created_at TEXT NOT NULL);"""
+    )
+    conn.commit()
+    conn.close()
+
+    store.init_db(db)
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(digest_items)")}
+    assert "severity" in cols
+    conn.close()
+
+
 def test_seen_entries_dedup(temp_db):
     urls = ["https://a/1", "https://a/2", "https://a/3"]
     assert store.filter_unseen(urls) == urls  # anfangs nichts gesehen

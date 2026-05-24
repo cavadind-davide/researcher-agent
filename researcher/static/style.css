@@ -226,3 +226,21 @@ main { max-width: var(--max); margin: 0 auto; padding: 2rem; }
 .digest-why, .digest-attention { margin: 0.4rem 0; font-size: 0.95rem; }
 .digest-attention { color: #ffe1c2; }
 .digest-link { margin: 0.6rem 0 0; font-size: 0.85rem; }
+
+.sev {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 0.4rem;
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+}
+.sev-aktiv-ausgenutzt { background: #5c1a1a; color: #ffb4a2; border-color: #b3261e; }
+.sev-kritisch { background: #5a1d1d; color: #ffc9bf; border-color: #dd3333; }
+.sev-hoch { background: #5a3a14; color: #ffd9a8; border-color: #e08a1e; }
+.sev-mittel { background: #4a4416; color: #f0e6a0; border-color: #c9b53a; }
+.sev-info { background: #25324a; color: #bcd2f0; border-color: #3a4f7a; }

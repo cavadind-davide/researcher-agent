@@ -19,6 +19,7 @@
       <a href="{{ item.url }}" rel="noopener noreferrer" target="_blank">{{ item.title }}</a>
     </h2>
     <div class="digest-meta">
+      {% if item.severity %}<span class="sev sev-{{ item.severity }}">{{ item.severity }}</span>{% endif %}
       <span class="source-name">{{ item.source_name }}</span>
       {% if item.published_at %}<span class="source-meta">{{ item.published_at|fmt_date }}</span>{% endif %}
     </div>

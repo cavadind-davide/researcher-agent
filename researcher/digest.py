@@ -158,6 +158,7 @@ def _enrich(items: list[dict], by_url: dict[str, FeedEntry]) -> list[dict]:
                 "summary": it.get("summary"),
                 "why_relevant": it.get("why_relevant"),
                 "attention": it.get("attention"),
+                "severity": it.get("severity"),
                 "published_at": src.published.date().isoformat() if src.published else None,
             }
         )

@@ -106,6 +106,7 @@ def _digest_views() -> list[dict]:
                         "summary": it.summary,
                         "why_relevant": it.why_relevant,
                         "attention": it.attention,
+                        "severity": it.severity,
                         "published_at": it.published_at,
                     }
                     for it in items

@@ -76,6 +76,22 @@ def test_render_all_writes_pages_and_splits_archive(temp_db, monkeypatch, tmp_pa
     assert "Alter Eintrag" in archive
 
 
+def test_render_weekly_shows_severity_badge(temp_db, monkeypatch, tmp_path):
+    dist = tmp_path / "dist"
+    monkeypatch.setattr(render, "DIST_DIR", dist)
+    week = _current_week()
+    did = store.upsert_digest(week)
+    store.replace_digest_items(did, [
+        {"title": "Kritische RCE", "url": "https://a/1", "severity": "aktiv-ausgenutzt"},
+        {"title": "Hintergrund", "url": "https://a/2"},  # ohne severity -> kein Badge
+    ])
+    render.render_all()
+    weekly = (dist / "weekly" / f"{week}.html").read_text(encoding="utf-8")
+    assert 'class="sev sev-aktiv-ausgenutzt"' in weekly
+    # Item ohne severity erzeugt kein leeres Badge
+    assert weekly.count('class="sev ') == 1
+
+
 def test_render_status_and_archived_topics(temp_db, monkeypatch, tmp_path):
     dist = tmp_path / "dist"
     monkeypatch.setattr(render, "DIST_DIR", dist)

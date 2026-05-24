@@ -194,7 +194,7 @@ def research(question: str, *, focus_urls: list[str] | None = None) -> dict[str,
 
 # --- Wöchentliches Briefing ----------------------------------------------
 
-_DIGEST_FIELDS = ("url", "title", "summary", "why_relevant", "attention")
+_DIGEST_FIELDS = ("url", "title", "summary", "why_relevant", "attention", "severity")
 
 
 def _format_candidates(candidates: list[dict[str, Any]]) -> str:

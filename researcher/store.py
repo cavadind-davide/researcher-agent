@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS digest_items (
   summary TEXT,
   why_relevant TEXT,
   attention TEXT,
+  severity TEXT,
   published_at TEXT,
   created_at TEXT NOT NULL
 );
@@ -113,6 +114,7 @@ class DigestItem:
     attention: str | None
     published_at: str | None
     created_at: str
+    severity: str | None = None
 
 
 def now_iso() -> str:
@@ -138,6 +140,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     cols = {row["name"] for row in conn.execute("PRAGMA table_info(topics)")}
     if "archived" not in cols:
         conn.execute("ALTER TABLE topics ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+    item_cols = {row["name"] for row in conn.execute("PRAGMA table_info(digest_items)")}
+    if item_cols and "severity" not in item_cols:
+        conn.execute("ALTER TABLE digest_items ADD COLUMN severity TEXT")
 
 
 def init_db(db_path: Path = DB_PATH) -> None:
@@ -307,8 +312,8 @@ def replace_digest_items(digest_id: int, items: list[dict]) -> None:
         for it in items:
             conn.execute(
                 """INSERT INTO digest_items
-                   (digest_id, title, url, source_name, summary, why_relevant, attention, published_at, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (digest_id, title, url, source_name, summary, why_relevant, attention, severity, published_at, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     digest_id,
                     it["title"],
@@ -317,6 +322,7 @@ def replace_digest_items(digest_id: int, items: list[dict]) -> None:
                     it.get("summary"),
                     it.get("why_relevant"),
                     it.get("attention"),
+                    it.get("severity"),
                     it.get("published_at"),
                     ts,
                 ),

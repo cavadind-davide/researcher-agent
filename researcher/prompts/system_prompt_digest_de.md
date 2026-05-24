@@ -29,7 +29,8 @@ Antworte als **ein einzelnes JSON-Array** in einem Markdown-Codefence ```json �
     "title": "Prägnanter Titel des Eintrags",
     "summary": "2–4 Sätze: worum es geht, technisch präzise und knapp.",
     "why_relevant": "Warum das für eine:n Security-Architekt:in relevant ist.",
-    "attention": "Was besondere Beachtung verdient bzw. konkret zu tun ist."
+    "attention": "Was besondere Beachtung verdient bzw. konkret zu tun ist.",
+    "severity": "einer von: aktiv-ausgenutzt | kritisch | hoch | mittel | info"
   }
 ]
 ```
@@ -37,6 +38,7 @@ Antworte als **ein einzelnes JSON-Array** in einem Markdown-Codefence ```json �
 ## Regeln
 
 - **Ausschließlich Deutsch.** Technisch präzise, knapp, kein Marketing-Ton.
+- `severity` einordnen aus Architektur-/Risikosicht: **aktiv-ausgenutzt** (in-the-wild ausgenutzt, z. B. CISA KEV), **kritisch** (RCE/AuthN-Bypass o. Ä. mit breiter Wirkung), **hoch**, **mittel**, **info** (Hintergrund/Guidance). Genau einen Wert aus der Liste verwenden.
 - `url` muss **exakt** eine der vorgegebenen Kandidaten-URLs sein – keine anderen, keine erfundenen.
 - Verwende in den Textfeldern **keine geraden Anführungszeichen** (`"`); nutze bei Bedarf typografische „…" – das hält das JSON robust.
 - Keine Zeilenumbrüche innerhalb der Feldwerte.
