@@ -21,6 +21,7 @@ from .mcp_config import allowed_tools, build_mcp_servers
 
 PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "system_prompt_de.md"
 DIGEST_PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "system_prompt_digest_de.md"
+ORG_CONTEXT_PATH = Path(__file__).resolve().parent / "prompts" / "org_context_de.md"
 
 
 def load_system_prompt() -> str:
@@ -29,6 +30,27 @@ def load_system_prompt() -> str:
 
 def load_digest_prompt() -> str:
     return DIGEST_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def load_org_context() -> str:
+    return ORG_CONTEXT_PATH.read_text(encoding="utf-8")
+
+
+def _with_org_context(system_prompt: str) -> str:
+    """Hänge den Einsatzkontext (Auftraggeber-Profil) an einen System-Prompt an."""
+    return system_prompt + "\n\n" + load_org_context()
+
+
+def _research_system_prompt(focus_urls: list[str] | None = None) -> str:
+    sp = load_system_prompt()
+    if focus_urls:
+        focus_block = "\n".join(f"- {u}" for u in focus_urls)
+        sp += "\n\n# Zusatz: Fokus-Quellen (vorrangig prüfen)\n" + focus_block
+    return _with_org_context(sp)
+
+
+def _digest_system_prompt() -> str:
+    return _with_org_context(load_digest_prompt())
 
 
 def make_slug(question: str, max_length: int = 70) -> str:
@@ -56,19 +78,13 @@ async def _run_query(prompt: str, system_prompt: str) -> str:
 
 
 async def _run_agent(prompt: str, *, focus_urls: list[str] | None = None) -> str:
-    """Recherche-Lauf mit dem Frage-System-Prompt."""
-    system_prompt = load_system_prompt()
-    if focus_urls:
-        focus_block = "\n".join(f"- {u}" for u in focus_urls)
-        system_prompt += (
-            "\n\n# Zusatz: Fokus-Quellen (vorrangig prüfen)\n" + focus_block
-        )
-    return await _run_query(prompt, system_prompt)
+    """Recherche-Lauf mit dem Frage-System-Prompt (inkl. Org-Kontext)."""
+    return await _run_query(prompt, _research_system_prompt(focus_urls))
 
 
 async def _run_digest_agent(candidates_block: str) -> str:
-    """Briefing-Lauf mit dem Digest-System-Prompt."""
-    return await _run_query(candidates_block, load_digest_prompt())
+    """Briefing-Lauf mit dem Digest-System-Prompt (inkl. Org-Kontext)."""
+    return await _run_query(candidates_block, _digest_system_prompt())
 
 
 _JSON_FENCE = re.compile(r"```json\s*\n(?P<body>.*?)\n```", re.DOTALL | re.IGNORECASE)

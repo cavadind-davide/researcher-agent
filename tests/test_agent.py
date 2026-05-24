@@ -212,3 +212,25 @@ def test_summarize_digest_retries_then_succeeds(monkeypatch):
     items = agent.summarize_digest([{"url": "https://a/1", "title": "x"}])
     assert fake.calls == 2
     assert items[0]["url"] == "https://a/1"
+
+
+# --- Org-Kontext-Injektion ------------------------------------------------
+
+def test_org_context_has_key_terms():
+    ctx = agent.load_org_context()
+    for term in ["Azure", "FINMA", "Zero-Trust", "GitLab", "Wiz"]:
+        assert term in ctx
+
+
+def test_digest_system_prompt_includes_base_and_org_context():
+    sp = agent._digest_system_prompt()
+    assert "Security-Briefing" in sp          # aus dem Digest-Basis-Prompt
+    assert "Einsatzkontext" in sp             # aus dem Org-Kontext
+    assert "Azure OpenAI" in sp
+
+
+def test_research_system_prompt_includes_org_context_and_focus():
+    sp = agent._research_system_prompt(["https://focus/1"])
+    assert "IT-Sicherheitsarchitekt" in sp    # aus dem Recherche-Basis-Prompt
+    assert "Einsatzkontext" in sp             # Org-Kontext angehängt
+    assert "https://focus/1" in sp            # Fokus-Quelle eingebettet
