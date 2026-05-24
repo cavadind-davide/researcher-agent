@@ -74,3 +74,30 @@ def test_render_all_writes_pages_and_splits_archive(temp_db, monkeypatch, tmp_pa
     archive = (dist / "archive.html").read_text(encoding="utf-8")
     assert "2020-W01" in archive
     assert "Alter Eintrag" in archive
+
+
+def test_render_status_and_archived_topics(temp_db, monkeypatch, tmp_path):
+    dist = tmp_path / "dist"
+    monkeypatch.setattr(render, "DIST_DIR", dist)
+
+    store.upsert_topic(slug="active1", question="Aktive Frage?", tldr="A", body_md="b", tags="iam")
+    store.upsert_topic(slug="arch1", question="Archivierte Frage?", tldr="A", body_md="b", tags="")
+    store.set_topic_archived("arch1", True)
+
+    render.render_all()
+    index = (dist / "index.html").read_text(encoding="utf-8")
+
+    # Status-Sektion
+    assert 'class="status"' in index
+    assert "aktive Recherchen" in index
+
+    # Aktive im Hauptteil, archivierte in eigener (einklappbarer) Sektion
+    assert "Aktive Frage?" in index
+    assert 'class="archive-topics"' in index
+    assert "Archivierte Frage?" in index
+    assert index.index("Aktive Frage?") < index.index('class="archive-topics"')
+    assert index.index('class="archive-topics"') < index.index("Archivierte Frage?")
+
+    # Beide Topic-Seiten existieren weiterhin
+    assert (dist / "topics" / "active1.html").exists()
+    assert (dist / "topics" / "arch1.html").exists()

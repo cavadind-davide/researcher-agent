@@ -112,6 +112,18 @@ def _digest_views() -> list[dict]:
     return views
 
 
+def _topic_view(t: store.Topic) -> dict:
+    return {
+        "slug": t.slug,
+        "question": t.question,
+        "tldr": _split_tldr(t.tldr),
+        "tags": _split_tags(t.tags),
+        "last_refreshed_at": t.last_refreshed_at,
+        "created_at": t.created_at,
+        "is_stale": _is_stale(t),
+    }
+
+
 def _copy_static() -> None:
     src = PKG_DIR / "static"
     dst = DIST_DIR / "assets"
@@ -129,30 +141,29 @@ def render_all() -> None:
     _copy_static()
 
     env = _env()
-    topics = store.list_topics()
-
-    topic_views = []
-    for t in topics:
-        topic_views.append(
-            {
-                "slug": t.slug,
-                "question": t.question,
-                "tldr": _split_tldr(t.tldr),
-                "tags": _split_tags(t.tags),
-                "last_refreshed_at": t.last_refreshed_at,
-                "created_at": t.created_at,
-                "is_stale": _is_stale(t),
-            }
-        )
+    all_topics = store.list_topics(include_archived=True)
+    active_topics = [t for t in all_topics if not t.archived]
+    archived_topics = [t for t in all_topics if t.archived]
+    topic_views = [_topic_view(t) for t in active_topics]
+    archived_topic_views = [_topic_view(t) for t in archived_topics]
 
     digest_views = _digest_views()
     recent_digests = [v for v in digest_views if v["is_recent"]]
     archived_digests = [v for v in digest_views if not v["is_recent"]]
 
     any_stale = any(v["is_stale"] for v in topic_views)
+    status = {
+        "topics_active": len(active_topics),
+        "topics_archived": len(archived_topics),
+        "topics_stale": sum(1 for v in topic_views if v["is_stale"]),
+        "briefings": len(digest_views),
+        "last_refreshed_at": max((t.last_refreshed_at for t in all_topics), default=None),
+    }
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     rendered_index = env.get_template("index.html").render(
         topics=topic_views,
+        archived_topics=archived_topic_views,
+        status=status,
         recent_digests=recent_digests,
         archived_digests=archived_digests,
         any_stale=any_stale,
@@ -174,8 +185,7 @@ def render_all() -> None:
     (DIST_DIR / "archive.html").write_text(rendered_archive, encoding="utf-8")
 
     topic_tpl = env.get_template("topic.html")
-    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    for t in topics:
+    for t in all_topics:
         sources = store.get_sources(t.id)
         rendered = topic_tpl.render(
             topic={

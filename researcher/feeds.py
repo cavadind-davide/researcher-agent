@@ -1,50 +1,31 @@
 """Kuratierte Quellen-Feeds für das wöchentliche Security-Briefing.
 
-Editierbar: Name, Feed-URL (RSS/Atom), Kategorie. Alle Einträge wurden gegen
-``feedparser`` verifiziert. Weitere Feeds einfach in ``FEEDS`` ergänzen –
-``digest.py`` holt und parst sie generisch.
+Die Liste liegt editierbar in ``feeds.json`` (Name, Feed-URL, Kategorie) und wird
+hier geladen bzw. um neue Feeds ergänzt. ``digest.py`` nutzt ``load_feeds()``;
+``researcher add-feed`` hängt validierte Feeds über ``append_feed()`` an.
 """
 from __future__ import annotations
 
-FEEDS: list[dict[str, str]] = [
-    {
-        "name": "CISA Advisories",
-        "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",
-        "category": "advisory",
-    },
-    {
-        "name": "CERT-Bund (BSI) Warnungen",
-        "url": "https://wid.cert-bund.de/content/public/securityAdvisory/rss",
-        "category": "advisory",
-    },
-    {
-        "name": "MSRC Security Update Guide",
-        "url": "https://api.msrc.microsoft.com/update-guide/rss",
-        "category": "vendor",
-    },
-    {
-        "name": "Microsoft Security Blog",
-        "url": "https://www.microsoft.com/en-us/security/blog/feed/",
-        "category": "threat-intel",
-    },
-    {
-        "name": "Google Project Zero",
-        "url": "https://googleprojectzero.blogspot.com/feeds/posts/default",
-        "category": "research",
-    },
-    {
-        "name": "Heise Security",
-        "url": "https://www.heise.de/security/rss/news-atom.xml",
-        "category": "news",
-    },
-    {
-        "name": "SANS Internet Storm Center",
-        "url": "https://isc.sans.edu/rssfeed.xml",
-        "category": "threat-intel",
-    },
-    {
-        "name": "NCSC UK",
-        "url": "https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml",
-        "category": "guidance",
-    },
-]
+import json
+from pathlib import Path
+
+FEEDS_PATH = Path(__file__).resolve().parent / "feeds.json"
+
+
+def load_feeds() -> list[dict[str, str]]:
+    return json.loads(FEEDS_PATH.read_text(encoding="utf-8"))
+
+
+def feed_exists(url: str) -> bool:
+    return any(f.get("url") == url for f in load_feeds())
+
+
+def append_feed(name: str, url: str, category: str = "") -> bool:
+    """Hänge einen Feed an ``feeds.json`` an. Liefert ``False``, wenn die URL
+    bereits vorhanden ist (kein Doppeleintrag)."""
+    feeds = load_feeds()
+    if any(f.get("url") == url for f in feeds):
+        return False
+    feeds.append({"name": name, "url": url, "category": category})
+    FEEDS_PATH.write_text(json.dumps(feeds, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return True

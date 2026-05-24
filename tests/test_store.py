@@ -106,3 +106,46 @@ def test_seen_entries_dedup(temp_db):
 
 def test_filter_unseen_empty(temp_db):
     assert store.filter_unseen([]) == []
+
+
+# --- Archivierung ---------------------------------------------------------
+
+def test_archive_and_unarchive_topic(temp_db):
+    store.upsert_topic(slug="s1", question="Q", tldr="A", body_md="b", tags="")
+    assert store.get_topic("s1").archived is False
+    assert store.set_topic_archived("s1", True) is True
+    assert store.get_topic("s1").archived is True
+    assert store.list_topics() == []                       # Default ohne Archiv
+    assert len(store.list_topics(include_archived=True)) == 1
+    store.set_topic_archived("s1", False)
+    assert len(store.list_topics()) == 1
+
+
+def test_set_topic_archived_unknown_slug(temp_db):
+    assert store.set_topic_archived("gibtsnicht", True) is False
+
+
+def test_migration_adds_archived_to_old_db(tmp_path):
+    import sqlite3
+    db = tmp_path / "old.sqlite"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        """CREATE TABLE topics (
+             id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, question TEXT NOT NULL,
+             tldr TEXT, body_md TEXT, tags TEXT, created_at TEXT NOT NULL, last_refreshed_at TEXT NOT NULL
+           );"""
+    )
+    conn.execute(
+        "INSERT INTO topics (slug, question, created_at, last_refreshed_at) VALUES ('s','q','t','t')"
+    )
+    conn.commit()
+    conn.close()
+
+    store.init_db(db)  # soll die fehlende Spalte ergänzen
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(topics)")}
+    assert "archived" in cols
+    assert conn.execute("SELECT archived FROM topics WHERE slug='s'").fetchone()["archived"] == 0
+    conn.close()

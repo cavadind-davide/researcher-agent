@@ -35,3 +35,4 @@ packages = ["researcher"]
 "researcher/templates" = "researcher/templates"
 "researcher/static" = "researcher/static"
 "researcher/prompts" = "researcher/prompts"
+"researcher/feeds.json" = "researcher/feeds.json"

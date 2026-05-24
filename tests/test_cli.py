@@ -58,3 +58,58 @@ def test_persist_exits_when_no_safe_sources(temp_db, monkeypatch):
     payload = _payload([{"url": "javascript:alert(1)", "title": "Böse"}])
     with pytest.raises(typer.Exit):
         cli._persist(payload)
+
+
+# --- archive-topic / unarchive-topic --------------------------------------
+
+def test_archive_topic_cli(temp_db, monkeypatch, tmp_path):
+    monkeypatch.setattr(cli.render, "DIST_DIR", tmp_path / "dist")
+    store.upsert_topic(slug="s1", question="Q", tldr="A", body_md="b", tags="")
+    cli.archive_topic("s1")
+    assert store.get_topic("s1").archived is True
+    cli.unarchive_topic("s1")
+    assert store.get_topic("s1").archived is False
+
+
+def test_archive_topic_cli_unknown_exits(temp_db):
+    with pytest.raises(typer.Exit):
+        cli.archive_topic("gibtsnicht")
+
+
+# --- add-feed -------------------------------------------------------------
+
+def test_add_feed_valid(tmp_path, monkeypatch):
+    p = tmp_path / "feeds.json"
+    p.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(cli.feeds, "FEEDS_PATH", p)
+    monkeypatch.setattr(cli.digest_mod, "validate_feed", lambda url: (True, "Test Feed"))
+    cli.add_feed(url="https://example.test/rss", name="Test", category="news")
+    assert cli.feeds.load_feeds() == [
+        {"name": "Test", "url": "https://example.test/rss", "category": "news"}
+    ]
+
+
+def test_add_feed_invalid_feed_exits(tmp_path, monkeypatch):
+    p = tmp_path / "feeds.json"
+    p.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(cli.feeds, "FEEDS_PATH", p)
+    monkeypatch.setattr(cli.digest_mod, "validate_feed", lambda url: (False, "kaputt"))
+    with pytest.raises(typer.Exit):
+        cli.add_feed(url="https://example.test/rss", name="Test")
+    assert cli.feeds.load_feeds() == []  # nichts angehängt
+
+
+def test_add_feed_unsafe_url_exits(tmp_path, monkeypatch):
+    # validate_feed darf gar nicht erst erreicht werden
+    monkeypatch.setattr(cli.digest_mod, "validate_feed", lambda url: (_ for _ in ()).throw(AssertionError("nicht erreichen")))
+    with pytest.raises(typer.Exit):
+        cli.add_feed(url="javascript:alert(1)", name="X")
+
+
+def test_add_feed_duplicate_exits(tmp_path, monkeypatch):
+    p = tmp_path / "feeds.json"
+    p.write_text('[{"name": "A", "url": "https://a", "category": ""}]', encoding="utf-8")
+    monkeypatch.setattr(cli.feeds, "FEEDS_PATH", p)
+    with pytest.raises(typer.Exit):
+        cli.add_feed(url="https://a", name="A2")
+    assert len(cli.feeds.load_feeds()) == 1

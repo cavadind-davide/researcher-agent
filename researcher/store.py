@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS topics (
   body_md TEXT,
   tags TEXT,
   created_at TEXT NOT NULL,
-  last_refreshed_at TEXT NOT NULL
+  last_refreshed_at TEXT NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sources (
@@ -76,6 +77,7 @@ class Topic:
     tags: str | None
     created_at: str
     last_refreshed_at: str
+    archived: bool = False
 
 
 @dataclass
@@ -130,9 +132,18 @@ def connect(db_path: Path = DB_PATH) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Idempotente Schema-Migrationen für bestehende DBs (CREATE TABLE IF NOT
+    EXISTS ändert vorhandene Tabellen nicht)."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(topics)")}
+    if "archived" not in cols:
+        conn.execute("ALTER TABLE topics ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+
+
 def init_db(db_path: Path = DB_PATH) -> None:
     with connect(db_path) as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
 
 
 def upsert_topic(
@@ -202,18 +213,36 @@ def mark_topic_refreshed(topic_id: int) -> None:
         conn.execute("UPDATE sources SET is_stale = 0 WHERE topic_id = ?", (topic_id,))
 
 
-def list_topics() -> list[Topic]:
+def _topic_from_row(row) -> Topic:
+    d = dict(row)
+    d["archived"] = bool(d.get("archived", 0))
+    return Topic(**d)
+
+
+def list_topics(include_archived: bool = False) -> list[Topic]:
+    sql = "SELECT * FROM topics"
+    if not include_archived:
+        sql += " WHERE archived = 0"
+    sql += " ORDER BY last_refreshed_at DESC"
     with connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM topics ORDER BY last_refreshed_at DESC"
-        ).fetchall()
-    return [Topic(**dict(r)) for r in rows]
+        rows = conn.execute(sql).fetchall()
+    return [_topic_from_row(r) for r in rows]
 
 
 def get_topic(slug: str) -> Topic | None:
     with connect() as conn:
         row = conn.execute("SELECT * FROM topics WHERE slug = ?", (slug,)).fetchone()
-    return Topic(**dict(row)) if row else None
+    return _topic_from_row(row) if row else None
+
+
+def set_topic_archived(slug: str, archived: bool) -> bool:
+    """Setze/entferne den Archiv-Status. Liefert True, wenn ein Topic getroffen wurde."""
+    with connect() as conn:
+        cur = conn.execute(
+            "UPDATE topics SET archived = ? WHERE slug = ?",
+            (1 if archived else 0, slug),
+        )
+        return cur.rowcount > 0
 
 
 def get_sources(topic_id: int) -> list[Source]:
@@ -249,7 +278,7 @@ def topics_with_stale_sources() -> list[Topic]:
                GROUP BY t.id
                ORDER BY t.last_refreshed_at"""
         ).fetchall()
-    return [Topic(**dict(r)) for r in rows]
+    return [_topic_from_row(r) for r in rows]
 
 
 # --- Wöchentliches Briefing (Digests) ------------------------------------

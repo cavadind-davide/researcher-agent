@@ -16,7 +16,7 @@ import feedparser
 import httpx
 
 from . import agent, store
-from .feeds import FEEDS
+from .feeds import load_feeds
 
 USER_AGENT = "ResearcherAgent/0.1 (+https://github.com/)"
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
@@ -46,6 +46,22 @@ class FeedEntry:
             "published_at": self.published.date().isoformat() if self.published else None,
             "summary": self.summary,
         }
+
+
+def validate_feed(url: str) -> tuple[bool, str]:
+    """Prüfe, ob ``url`` ein abrufbarer, parsebarer RSS/Atom-Feed ist.
+    Liefert ``(ok, Titel-oder-Fehlertext)``."""
+    try:
+        with httpx.Client(timeout=TIMEOUT, headers=HEADERS, follow_redirects=True) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+    except httpx.HTTPError as e:
+        return False, f"HTTP-Fehler: {e}"
+    parsed = feedparser.parse(resp.content)
+    title = (parsed.feed.get("title") or "").strip()
+    if not parsed.entries and not title:
+        return False, "kein parsebarer Feed (weder Einträge noch Titel gefunden)"
+    return True, title or url
 
 
 def current_week(now: datetime | None = None) -> str:
@@ -117,7 +133,7 @@ def collect_entries(*, now: datetime | None = None) -> list[FeedEntry]:
     """Hole alle Feeds, behalte neue Einträge im Zeitfenster (pro Feed begrenzt)
     und filtere bereits gesehene URLs heraus."""
     cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=WINDOW_DAYS)
-    per_feed = asyncio.run(_fetch_all(FEEDS))
+    per_feed = asyncio.run(_fetch_all(load_feeds()))
     collected: list[FeedEntry] = []
     for entries in per_feed:
         collected.extend(_select_recent(entries, cutoff, MAX_PER_FEED))

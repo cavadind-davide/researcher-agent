@@ -13,7 +13,7 @@ import httpx
 import typer
 from dotenv import load_dotenv
 
-from . import agent, digest as digest_mod, render, sources, store
+from . import agent, digest as digest_mod, feeds, render, sources, store
 
 ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
@@ -213,6 +213,54 @@ def digest() -> None:
         )
     render.render_all()
     typer.echo(f"✓ HTML aktualisiert in {render.DIST_DIR}")
+
+
+@app.command()
+def archive_topic(
+    slug: Annotated[str, typer.Argument(help="Slug des zu archivierenden Topics.")],
+) -> None:
+    """Verschiebe ein Topic ins Archiv (keine Frische-Prüfung mehr, bleibt einsehbar)."""
+    store.init_db()
+    if not store.set_topic_archived(slug, True):
+        typer.secho(f"Topic '{slug}' nicht gefunden.", fg="red", err=True)
+        raise typer.Exit(1)
+    render.render_all()
+    typer.echo(f"✓ Topic '{slug}' archiviert.")
+
+
+@app.command()
+def unarchive_topic(
+    slug: Annotated[str, typer.Argument(help="Slug des zu reaktivierenden Topics.")],
+) -> None:
+    """Hole ein Topic aus dem Archiv zurück (wird wieder auf Aktualität geprüft)."""
+    store.init_db()
+    if not store.set_topic_archived(slug, False):
+        typer.secho(f"Topic '{slug}' nicht gefunden.", fg="red", err=True)
+        raise typer.Exit(1)
+    render.render_all()
+    typer.echo(f"✓ Topic '{slug}' reaktiviert.")
+
+
+@app.command()
+def add_feed(
+    url: Annotated[str, typer.Option("--url", help="Feed-URL (RSS/Atom).")],
+    name: Annotated[str, typer.Option("--name", help="Anzeigename der Quelle.")],
+    category: Annotated[str, typer.Option("--category", help="Kategorie (z.B. advisory, news).")] = "",
+) -> None:
+    """Validiere einen RSS/Atom-Feed und ergänze ihn fürs Wochen-Briefing."""
+    if not _is_safe_url(url):
+        typer.secho(f"Ungültige URL (nur http/https erlaubt): {url!r}", fg="red", err=True)
+        raise typer.Exit(1)
+    if feeds.feed_exists(url):
+        typer.secho(f"Feed bereits vorhanden: {url}", fg="yellow")
+        raise typer.Exit(0)
+    typer.echo(f"› Prüfe Feed: {url}")
+    ok, info = digest_mod.validate_feed(url)
+    if not ok:
+        typer.secho(f"✗ Feed nicht valide: {info}", fg="red", err=True)
+        raise typer.Exit(1)
+    feeds.append_feed(name=name, url=url, category=category)
+    typer.echo(f"✓ Feed ergänzt: {name} — {url}  (erkannt als: {info})")
 
 
 @app.command(name="list")

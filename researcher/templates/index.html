@@ -15,6 +15,18 @@
   </div>
 </section>
 
+{% if status %}
+<section class="status">
+  <ul class="status-grid">
+    <li><strong>{{ status.topics_active }}</strong> aktive Recherchen</li>
+    <li><strong>{{ status.topics_stale }}</strong> davon veraltet</li>
+    <li><strong>{{ status.briefings }}</strong> Briefings</li>
+    {% if status.topics_archived %}<li><strong>{{ status.topics_archived }}</strong> archiviert</li>{% endif %}
+    {% if status.last_refreshed_at %}<li>zuletzt aktualisiert: {{ status.last_refreshed_at|fmt_date }}</li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="briefings">
   <h2 class="section-title">Aktuelle Wochen-Briefings</h2>
   <div class="grid">
@@ -63,6 +75,24 @@
     {% endfor %}
   </div>
 </section>
+
+{% if archived_topics %}
+<section class="archive-topics">
+  <details>
+    <summary class="section-title">Archivierte Recherchen ({{ archived_topics|length }})</summary>
+    <div class="grid">
+      {% for t in archived_topics %}
+      <article class="card">
+        <header class="card-header">
+          <h2><a href="topics/{{ t.slug }}.html">{{ t.question }}</a></h2>
+          <span class="badge">archiviert</span>
+        </header>
+      </article>
+      {% endfor %}
+    </div>
+  </details>
+</section>
+{% endif %}
 
 {% if archived_digests %}
 <section class="archive-briefings">
