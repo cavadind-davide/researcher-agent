@@ -2,6 +2,11 @@ name: Build & Deploy Pages
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Digest erzwingen (ignoriert seen_entries, re-summiert die aktuellen Kandidaten)"
+        type: boolean
+        default: false
   schedule:
     - cron: "0 6 * * 1"   # jeden Montag 06:00 UTC
 
@@ -49,7 +54,12 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
-        run: researcher digest
+        run: |
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            researcher digest --force
+          else
+            researcher digest
+          fi
 
       - name: Commit aktualisierte DB (falls geaendert)
         run: |
