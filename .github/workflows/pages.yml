@@ -33,7 +33,7 @@ jobs:
           cache: pip
 
       - name: Setup Node.js (fuer Brave-Search-MCP via npx)
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
