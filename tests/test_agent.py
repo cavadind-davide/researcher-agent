@@ -219,6 +219,30 @@ def test_run_query_passes_through_typed_sdk_errors(monkeypatch):
         asyncio.run(agent._run_query("Frage", "System"))
 
 
+def test_run_query_surfaces_cli_stderr_live_and_in_exception(monkeypatch, capsys):
+    # Ohne registrierten stderr-Callback pipet das SDK den CLI-Stderr-Stream gar
+    # nicht erst durch (subprocess_cli.py: stderr_dest = PIPE nur bei Callback).
+    # Deshalb landete die eigentliche Absturzursache bisher nie im Actions-Log.
+    async def _raising_query(*, prompt, options):
+        assert options.stderr is not None
+        options.stderr("npm error could not resolve @brave/brave-search-mcp-server")
+        options.stderr("Fatal error in message reader")
+        raise Exception("Command failed with exit code 1")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent, "query", _raising_query)
+    with pytest.raises(agent.AgentTransportError) as exc_info:
+        asyncio.run(agent._run_query("Frage", "System"))
+
+    # 1) live im CI-Log sichtbar (statt nur im Nachhinein aus der Exception zu raten)
+    captured = capsys.readouterr()
+    assert "[claude-cli stderr] npm error could not resolve @brave/brave-search-mcp-server" in captured.err
+    assert "[claude-cli stderr] Fatal error in message reader" in captured.err
+
+    # 2) zusätzlich in der Exception-Message, die research() beim Retry-Log ausgibt
+    assert "npm error could not resolve @brave/brave-search-mcp-server" in str(exc_info.value)
+
+
 # --- Digest -------------------------------------------------------------
 
 DIGEST_OK = """```json

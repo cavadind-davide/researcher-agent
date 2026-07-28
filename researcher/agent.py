@@ -5,6 +5,7 @@ import asyncio
 import json
 import re
 import sys
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -67,15 +68,38 @@ class AgentTransportError(RuntimeError):
     behandelbaren, retrybaren Fehlertyp zusammen."""
 
 
+_STDERR_TAIL_LINES = 30  # wie viele CLI-Stderr-Zeilen wir für Fehlermeldungen vorhalten
+
+
+def _stderr_sink(tail: deque[str]):
+    """Baut den ``stderr``-Callback für ``ClaudeAgentOptions``.
+
+    Ohne registrierten Callback pipet das SDK den Stderr-Stream des CLI-Subprozesses
+    gar nicht erst durch (siehe ``subprocess_cli.py``: ``stderr_dest = PIPE if
+    self._options.stderr is not None else None``) – deshalb war die tatsächliche
+    Absturzursache in den Actions-Logs bisher nie sichtbar, nur der feste Platzhalter
+    "Check stderr output for details". Wir geben jede Zeile sofort ins CI-Log weiter
+    und puffern zusätzlich die letzten Zeilen für die Fehlermeldung selbst.
+    """
+
+    def _sink(line: str) -> None:
+        print(f"[claude-cli stderr] {line}", file=sys.stderr)
+        tail.append(line)
+
+    return _sink
+
+
 async def _run_query(prompt: str, system_prompt: str) -> str:
     """Sendet ``prompt`` mit gegebenem System-Prompt an den Agent und liefert den
     letzten nicht-leeren Assistant-Text zurück."""
+    stderr_tail: deque[str] = deque(maxlen=_STDERR_TAIL_LINES)
     options = ClaudeAgentOptions(
         system_prompt=system_prompt,
         mcp_servers=build_mcp_servers(),
         allowed_tools=allowed_tools(),
         permission_mode="bypassPermissions",
         max_turns=25,
+        stderr=_stderr_sink(stderr_tail),
     )
 
     final_text = ""
@@ -93,7 +117,12 @@ async def _run_query(prompt: str, system_prompt: str) -> str:
         # einer "error"-Message ein nacktes Exception). Ohne diesen Fang landet ein
         # flackernder Message-Reader nicht in _RETRYABLE_ERRORS und crasht den
         # gesamten Refresh-Lauf statt retried zu werden.
-        raise AgentTransportError(str(exc)) from exc
+        message = str(exc)
+        if stderr_tail:
+            message += "\nCLI-Stderr (letzte {} Zeile(n)):\n{}".format(
+                len(stderr_tail), "\n".join(stderr_tail)
+            )
+        raise AgentTransportError(message) from exc
     return final_text
 
 
