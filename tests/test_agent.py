@@ -1,6 +1,8 @@
 """Unit-Tests für die Antwort-Parser und die Retry-Logik des Agents."""
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from claude_agent_sdk import CLINotFoundError, ProcessError
 
@@ -184,6 +186,37 @@ def test_summarize_digest_retries_on_process_error(monkeypatch):
     items = agent.summarize_digest([{"url": "https://a/1", "title": "x"}])
     assert fake.calls == 2
     assert items[0]["url"] == "https://a/1"
+
+
+def test_research_retries_on_agent_transport_error(monkeypatch):
+    # Reproduziert den Produktionsfehler vom 2026-07-20/27: das SDK wirft beim
+    # Message-Streaming ein nacktes Exception ("Command failed with exit code 1"),
+    # kein ProcessError/CLIConnectionError. Muss trotzdem retried werden.
+    fake = _RaisingThenOk(agent.AgentTransportError("Command failed with exit code 1"), VALID)
+    monkeypatch.setattr(agent, "_run_agent", fake)
+    payload = agent.research("Frage")
+    assert fake.calls == 2
+    assert payload["tldr"] == ["Kernaussage A"]
+
+
+def test_run_query_wraps_untyped_sdk_exception_as_transport_error(monkeypatch):
+    async def _raising_query(*, prompt, options):
+        raise Exception("Command failed with exit code 1")
+        yield  # pragma: no cover - macht die Funktion zu einem Async-Generator
+
+    monkeypatch.setattr(agent, "query", _raising_query)
+    with pytest.raises(agent.AgentTransportError):
+        asyncio.run(agent._run_query("Frage", "System"))
+
+
+def test_run_query_passes_through_typed_sdk_errors(monkeypatch):
+    async def _raising_query(*, prompt, options):
+        raise CLINotFoundError("Claude Code nicht gefunden")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent, "query", _raising_query)
+    with pytest.raises(CLINotFoundError):
+        asyncio.run(agent._run_query("Frage", "System"))
 
 
 # --- Digest -------------------------------------------------------------
