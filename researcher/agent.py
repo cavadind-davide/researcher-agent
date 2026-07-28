@@ -5,6 +5,7 @@ import asyncio
 import json
 import re
 import sys
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -60,23 +61,68 @@ def make_slug(question: str, max_length: int = 70) -> str:
     return slugify(question, max_length=max_length, word_boundary=True, save_order=True)
 
 
+class AgentTransportError(RuntimeError):
+    """Nicht vom SDK typisierter Transport-/Subprozess-Fehler (z. B. abgestürzter
+    CLI-Prozess während des Message-Streamings). Das SDK wirft hierfür intern nur
+    ein generisches ``Exception`` – wir fassen es hier zu einem gezielt
+    behandelbaren, retrybaren Fehlertyp zusammen."""
+
+
+_STDERR_TAIL_LINES = 30  # wie viele CLI-Stderr-Zeilen wir für Fehlermeldungen vorhalten
+
+
+def _stderr_sink(tail: deque[str]):
+    """Baut den ``stderr``-Callback für ``ClaudeAgentOptions``.
+
+    Ohne registrierten Callback pipet das SDK den Stderr-Stream des CLI-Subprozesses
+    gar nicht erst durch (siehe ``subprocess_cli.py``: ``stderr_dest = PIPE if
+    self._options.stderr is not None else None``) – deshalb war die tatsächliche
+    Absturzursache in den Actions-Logs bisher nie sichtbar, nur der feste Platzhalter
+    "Check stderr output for details". Wir geben jede Zeile sofort ins CI-Log weiter
+    und puffern zusätzlich die letzten Zeilen für die Fehlermeldung selbst.
+    """
+
+    def _sink(line: str) -> None:
+        print(f"[claude-cli stderr] {line}", file=sys.stderr)
+        tail.append(line)
+
+    return _sink
+
+
 async def _run_query(prompt: str, system_prompt: str) -> str:
     """Sendet ``prompt`` mit gegebenem System-Prompt an den Agent und liefert den
     letzten nicht-leeren Assistant-Text zurück."""
+    stderr_tail: deque[str] = deque(maxlen=_STDERR_TAIL_LINES)
     options = ClaudeAgentOptions(
         system_prompt=system_prompt,
         mcp_servers=build_mcp_servers(),
         allowed_tools=allowed_tools(),
         permission_mode="bypassPermissions",
         max_turns=25,
+        stderr=_stderr_sink(stderr_tail),
     )
 
     final_text = ""
-    async for msg in query(prompt=prompt, options=options):
-        if isinstance(msg, AssistantMessage):
-            for block in msg.content:
-                if isinstance(block, TextBlock) and block.text.strip():
-                    final_text = block.text
+    try:
+        async for msg in query(prompt=prompt, options=options):
+            if isinstance(msg, AssistantMessage):
+                for block in msg.content:
+                    if isinstance(block, TextBlock) and block.text.strip():
+                        final_text = block.text
+    except (CLINotFoundError, CLIConnectionError, ProcessError):
+        raise
+    except Exception as exc:
+        # Das SDK klassifiziert nicht jeden Subprozess-/Streaming-Fehler in einen
+        # seiner eigenen Fehlertypen (siehe query.py: receive_messages() wirft bei
+        # einer "error"-Message ein nacktes Exception). Ohne diesen Fang landet ein
+        # flackernder Message-Reader nicht in _RETRYABLE_ERRORS und crasht den
+        # gesamten Refresh-Lauf statt retried zu werden.
+        message = str(exc)
+        if stderr_tail:
+            message += "\nCLI-Stderr (letzte {} Zeile(n)):\n{}".format(
+                len(stderr_tail), "\n".join(stderr_tail)
+            )
+        raise AgentTransportError(message) from exc
     return final_text
 
 
@@ -164,9 +210,10 @@ def _validate(payload: dict[str, Any]) -> None:
 
 _MAX_RETRIES = 2
 # Wiederholbare Fehler: kaputtes/unvollständiges JSON (ValueError) sowie transiente
-# Subprozess-/Verbindungsfehler des Agent-SDK (z. B. ProcessError mit nativem Crash).
+# Subprozess-/Verbindungsfehler des Agent-SDK (z. B. ProcessError mit nativem Crash,
+# oder AgentTransportError für nicht typisierte Message-Reader-Abstürze).
 # CLINotFoundError ist NICHT transient (Konfigurationsfehler) und wird durchgereicht.
-_RETRYABLE_ERRORS = (ValueError, ProcessError, CLIConnectionError)
+_RETRYABLE_ERRORS = (ValueError, ProcessError, CLIConnectionError, AgentTransportError)
 
 
 def research(question: str, *, focus_urls: list[str] | None = None) -> dict[str, Any]:

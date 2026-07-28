@@ -185,17 +185,37 @@ def refresh(
         render.render_all()
         return
 
+    failed_slugs: list[str] = []
     for t in targets:
         srcs = store.get_sources(t.id)
         focus = [s.url for s in srcs if s.is_stale] if not force else [s.url for s in srcs]
         typer.echo(f"› Re-Recherche: {t.slug}")
-        payload = agent.research(t.question, focus_urls=focus)
+        try:
+            payload = agent.research(t.question, focus_urls=focus)
+        except agent.CLINotFoundError:
+            raise  # Konfigurationsfehler betrifft alle Topics gleichermassen
+        except Exception as exc:
+            # Ein einzelnes Topic, das auch nach den internen Retries in
+            # agent.research() noch scheitert, soll nicht den ganzen Lauf (und
+            # damit Commit/Digest/Deploy der übrigen, erfolgreichen Topics)
+            # verhindern.
+            typer.secho(f"  ⚠ Re-Recherche fehlgeschlagen, überspringe Topic: {exc}", fg="red", err=True)
+            failed_slugs.append(t.slug)
+            continue
         payload["slug"] = t.slug  # behalte stabilen Slug
         _persist(payload)
         store.mark_topic_refreshed(t.id)
 
     render.render_all()
-    typer.echo(f"✓ {len(targets)} Topic(s) aktualisiert.")
+    ok = len(targets) - len(failed_slugs)
+    typer.echo(f"✓ {ok} Topic(s) aktualisiert.")
+    if failed_slugs:
+        typer.secho(
+            f"⚠ {len(failed_slugs)} Topic(s) übersprungen: {', '.join(failed_slugs)}",
+            fg="yellow",
+            err=True,
+        )
+        raise typer.Exit(1)
 
 
 @app.command()

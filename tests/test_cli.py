@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 import typer
 
-from researcher import cli, store
+from researcher import agent, cli, sources, store
 
 
 @pytest.mark.parametrize("url", [
@@ -58,6 +58,56 @@ def test_persist_exits_when_no_safe_sources(temp_db, monkeypatch):
     payload = _payload([{"url": "javascript:alert(1)", "title": "Böse"}])
     with pytest.raises(typer.Exit):
         cli._persist(payload)
+
+
+# --- refresh: eine gescheiterte Re-Recherche darf nicht den ganzen Lauf ----
+# (und damit Commit/Deploy der übrigen Topics) verhindern. Siehe
+# researcher/agent.py AgentTransportError für den zugrundeliegenden Produktionsbug.
+
+def test_refresh_isolates_topic_failures(temp_db, monkeypatch):
+    tid_fail = store.upsert_topic(slug="fails", question="Q1?", tldr="A", body_md="b", tags="")
+    tid_ok = store.upsert_topic(slug="ok", question="Q2?", tldr="A", body_md="b", tags="")
+    store.replace_sources(
+        tid_fail, [{"url": "https://fail.test", "etag": None, "last_modified": None, "content_sha256": "h1"}]
+    )
+    store.replace_sources(
+        tid_ok, [{"url": "https://ok.test", "etag": None, "last_modified": None, "content_sha256": "h2"}]
+    )
+
+    def fake_check_sources(srcs):
+        return [
+            sources.FreshnessResult(
+                source_id=s.id, url=s.url, is_stale=True,
+                etag=s.etag, last_modified=s.last_modified, content_sha256=s.content_sha256,
+            )
+            for s in srcs
+        ]
+
+    monkeypatch.setattr(cli.sources, "check_sources", fake_check_sources)
+    monkeypatch.setattr(
+        cli.sources, "baseline_urls",
+        lambda urls: [{"etag": None, "last_modified": None, "content_sha256": "h"} for _ in urls],
+    )
+
+    def fake_research(question, *, focus_urls=None):
+        if question == "Q1?":
+            raise agent.AgentTransportError("dauerhaft kaputt")
+        return {
+            "question": question, "tldr": ["A"], "tags": [],
+            "body_md": "## Neu", "sources": [{"url": "https://ok.test", "title": "T"}],
+        }
+
+    monkeypatch.setattr(cli.agent, "research", fake_research)
+
+    rendered = []
+    monkeypatch.setattr(cli.render, "render_all", lambda: rendered.append(True))
+
+    with pytest.raises(typer.Exit):
+        cli.refresh()
+
+    assert rendered == [True]  # trotz gescheitertem Topic wird weiterhin gerendert (und damit deployt)
+    assert store.get_topic("ok").body_md == "## Neu"  # erfolgreiches Topic wurde persistiert
+    assert store.get_topic("fails").body_md == "b"  # gescheitertes Topic bleibt unverändert
 
 
 # --- archive-topic / unarchive-topic --------------------------------------

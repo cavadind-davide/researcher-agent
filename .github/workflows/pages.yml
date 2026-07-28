@@ -14,6 +14,7 @@ permissions:
   contents: write   # damit der Job die aktualisierte SQLite zurueckschreiben kann
   pages: write
   id-token: write
+  actions: write    # fuer den automatischen Rerun bei transienten Deploy-Fehlern
 
 concurrency:
   group: pages
@@ -44,6 +45,11 @@ jobs:
           pip install -e . --no-deps
 
       - name: Refresh research (re-recherchiert nur veraenderte Topics)
+        # Einzelne Topics werden intern mit Retries behandelt (siehe researcher/agent.py);
+        # schlägt eines davon dauerhaft fehl, soll das die anderen erfolgreich
+        # aktualisierten Topics trotzdem committen und deployen lassen, statt den
+        # kompletten Lauf abzubrechen.
+        continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
@@ -91,3 +97,19 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Bei transientem Deploy-Fehler automatisch neu versuchen
+        # actions/deploy-pages schlägt gelegentlich transient fehl ("Deployment
+        # failed, try again later.") - GitHub-seitiges Infra-Flackern, kein
+        # Problem in unserem Artifact. Statt auf einen manuellen Rerun zu warten,
+        # stossen wir automatisch (begrenzt auf 3 Versuche) einen Rerun der
+        # fehlgeschlagenen Jobs an.
+        if: failure() && fromJSON(github.run_attempt) < 3
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.actions.reRunWorkflowFailedJobs({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
