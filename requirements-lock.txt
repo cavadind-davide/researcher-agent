@@ -7,7 +7,7 @@ cffi==2.0.0
 claude-agent-sdk==0.1.68
 click==8.3.3
 colorama==0.4.6
-cryptography==48.0.1
+cryptography==50.0.0
 feedparser==6.0.12
 h11==0.16.0
 httpcore==1.0.9
