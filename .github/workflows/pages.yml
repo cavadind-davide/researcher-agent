@@ -76,6 +76,7 @@ jobs:
             echo "Keine DB-Aenderungen."
           else
             git commit -m "chore: aktualisierte Quellen-Frische [skip ci]"
+            git pull --rebase origin main
             git push
           fi
 
