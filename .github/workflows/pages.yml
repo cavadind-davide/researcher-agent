@@ -49,6 +49,7 @@ jobs:
         # schlägt eines davon dauerhaft fehl, soll das die anderen erfolgreich
         # aktualisierten Topics trotzdem committen und deployen lassen, statt den
         # kompletten Lauf abzubrechen.
+        id: refresh
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -56,6 +57,7 @@ jobs:
         run: researcher refresh
 
       - name: Weekly security digest (Feeds scannen + Briefing erstellen)
+        id: digest
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -65,6 +67,22 @@ jobs:
             researcher digest --force
           else
             researcher digest
+          fi
+
+      - name: Warnung sichtbar machen, falls Refresh/Digest fehlgeschlagen sind
+        # continue-on-error oben verhindert, dass ein einzelner defekter Lauf den
+        # kompletten Deploy blockiert - maskiert damit aber auch eine dauerhaft
+        # fehlschlagende Recherche/Digest als grünen Workflow (siehe Ausfall
+        # Juli-August 2026: 5 Wochen lang kein Refresh/Briefing, unbemerkt weil
+        # der Schritt "erfolgreich" blieb). Diese Annotation macht es sichtbar,
+        # ohne die Deploy-Toleranz selbst zu ändern.
+        if: steps.refresh.outcome == 'failure' || steps.digest.outcome == 'failure'
+        run: |
+          if [ "${{ steps.refresh.outcome }}" = "failure" ]; then
+            echo "::warning title=Refresh fehlgeschlagen::researcher refresh ist fehlgeschlagen - Topics wurden NICHT aktualisiert. Siehe Job-Log."
+          fi
+          if [ "${{ steps.digest.outcome }}" = "failure" ]; then
+            echo "::warning title=Digest fehlgeschlagen::researcher digest ist fehlgeschlagen - kein neues Wochen-Briefing erstellt. Siehe Job-Log."
           fi
 
       - name: Commit aktualisierte DB (falls geaendert)
