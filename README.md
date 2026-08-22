@@ -90,11 +90,13 @@ erreichbar.
 Beim ersten Speichern einer Quelle holt der Agent ETag / Last-Modified-Header
 sowie einen SHA-256-Hash des Body. Diese Werte landen in `data/researcher.sqlite`.
 
-`researcher refresh` führt pro Quelle:
+`researcher refresh` führt pro Quelle einen einzigen conditional `GET`-Request aus
+(`If-None-Match` / `If-Modified-Since` mit den gespeicherten Validatoren):
 
-1. einen `HEAD`-Request aus und vergleicht ETag und Last-Modified.
-2. Falls beide Header fehlen oder übereinstimmen, wird zusätzlich der Inhalt geladen
-   und sein SHA-256-Hash mit dem gespeicherten Wert verglichen.
+1. Antwortet der Server mit `304 Not Modified`, gilt die Quelle als aktuell —
+   ohne Body-Vergleich.
+2. Bei `200` wird stattdessen ein normalisierter Inhalts-Hash (SHA-256, bei
+   HTML/XML ohne Skripte/Styles/Tags) mit dem gespeicherten Wert verglichen.
 
 Topics, deren Quellen verändert wurden, werden vom Agent erneut bearbeitet —
 nur diese Quellen werden im System-Prompt als Fokus übergeben.
