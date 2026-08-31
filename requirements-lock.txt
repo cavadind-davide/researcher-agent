@@ -4,10 +4,10 @@ anyio==4.14.2
 attrs==26.1.0
 certifi==2026.7.22
 cffi==2.1.1
-claude-agent-sdk==0.2.144
-click==8.4.2
+claude-agent-sdk==0.2.147
+click==8.5.0
 colorama==0.4.6
-cryptography==50.0.0
+cryptography==50.0.1
 feedparser==6.0.14
 feedparser-sgmllib==2.1.0
 h11==0.16.0
@@ -17,24 +17,24 @@ httpx==0.28.1
 httpx2==2.12.0
 idna==3.19
 Jinja2==3.1.6
-json_repair==0.63.3
+json_repair==0.63.4
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
-mcp==2.0.0
-mcp-types==2.0.0
+mcp==2.1.1
+mcp-types==2.1.1
 mdurl==0.1.2
 opentelemetry-api==1.44.0
 pycparser==3.0
 pydantic==2.13.4
-pydantic_core==2.46.4
+pydantic_core==2.48.0
 Pygments==2.21.0
 PyJWT==2.13.0
 python-dotenv==1.2.3
 python-multipart==0.0.32
 python-slugify==8.0.4
-pywin32==311 ; sys_platform == "win32"
+pywin32==312 ; sys_platform == "win32"
 referencing==0.37.0
 rich==15.0.0
 rpds-py==2026.6.3
