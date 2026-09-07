@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -367,3 +367,14 @@ def filter_unseen(urls: list[str]) -> list[str]:
         rows = conn.execute("SELECT url FROM seen_entries").fetchall()
     seen = {r["url"] for r in rows}
     return [u for u in urls if u not in seen]
+
+
+def prune_seen_entries(older_than_days: int = 90) -> int:
+    """Lösche ``seen_entries``, die älter als ``older_than_days`` sind. Weit über dem
+    7-Tage-Fenster von :func:`researcher.digest.collect_entries`, also ohne Risiko für
+    die Dedup-Logik — verhindert nur, dass die Tabelle unbegrenzt wächst. Gibt die
+    Anzahl gelöschter Zeilen zurück."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM seen_entries WHERE seen_at < ?", (cutoff,))
+        return cur.rowcount

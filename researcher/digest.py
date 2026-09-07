@@ -183,4 +183,5 @@ def run_weekly_scan(*, now: datetime | None = None, force: bool = False) -> dict
     digest_id = store.upsert_digest(week)
     store.replace_digest_items(digest_id, enriched)
     store.mark_seen([e.url for e in entries])
+    store.prune_seen_entries()  # haelt seen_entries unbegrenzten Wachstums fern
     return {"week": week, "candidates": len(entries), "items": len(enriched)}
