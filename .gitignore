@@ -17,7 +17,7 @@ data/researcher.sqlite-shm
 # Lokale Vorschau (für Pages-Deploy aus dem Workflow heraus generiert)
 dist/
 
-# uv / pip
-uv.lock
+# uv.lock ist committed (Single Source of Truth für Dependency-Versionen,
+# siehe uv.lock statt requirements-lock.txt)
 *.egg-info/
 build/
