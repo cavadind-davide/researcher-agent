@@ -28,6 +28,14 @@ updates:
       - "dependencies"
       - "python"
     groups:
-      pip:
+      # Minor/Patch sicher buendeln (uv.lock garantiert konsistente Aufloesung).
+      # Major-Updates matchen diese Gruppe bewusst NICHT (update-types
+      # beschraenkt auf minor/patch) und bekommen dadurch automatisch einen
+      # eigenen PR statt im Sammel-PR unterzugehen - API-Bruch-Risiko soll
+      # einzeln sichtbar und review-faehig bleiben.
+      python-minor-patch:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
