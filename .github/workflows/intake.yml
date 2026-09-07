@@ -52,7 +52,7 @@ jobs:
 
       - name: Setup uv
         if: steps.auth.outputs.authorized == 'true'
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.12"
           enable-cache: true
