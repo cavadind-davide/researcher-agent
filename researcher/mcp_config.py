@@ -21,7 +21,11 @@ def build_mcp_servers() -> dict[str, dict[str, Any]]:
         servers["brave-search"] = {
             "type": "stdio",
             "command": "npx",
-            "args": ["-y", "@brave/brave-search-mcp-server"],
+            # Version gepinnt statt "latest": läuft mit BRAVE_API_KEY und wird bei
+            # jedem CI-Lauf frisch via npx geladen - ohne Pin würde ein neues,
+            # ungeprüftes Release des Drittanbieter-Pakets sofort und unbemerkt
+            # überall live gehen.
+            "args": ["-y", "@brave/brave-search-mcp-server@2.1.3"],
             "env": {"BRAVE_API_KEY": brave_key},
         }
 
