@@ -110,6 +110,88 @@ def test_refresh_isolates_topic_failures(temp_db, monkeypatch):
     assert store.get_topic("fails").body_md == "b"  # gescheitertes Topic bleibt unverändert
 
 
+# --- refresh: focus_urls muss trotz der Wiederverwendung der einmal geladenen -----
+# Sources (statt bis zu 3x store.get_sources() pro Topic) weiterhin nur die als
+# stale erkannten Quellen enthalten (bzw. bei --force alle).
+
+def test_refresh_focus_urls_only_stale_sources(temp_db, monkeypatch):
+    tid = store.upsert_topic(slug="s1", question="Q?", tldr="A", body_md="b", tags="")
+    store.replace_sources(tid, [
+        {"url": "https://fresh.test", "etag": None, "last_modified": None, "content_sha256": "h1"},
+        {"url": "https://stale.test", "etag": None, "last_modified": None, "content_sha256": "h2"},
+    ])
+
+    def fake_check_sources(srcs):
+        return [
+            sources.FreshnessResult(
+                source_id=s.id, url=s.url, is_stale=(s.url == "https://stale.test"),
+                etag=s.etag, last_modified=s.last_modified, content_sha256=s.content_sha256,
+            )
+            for s in srcs
+        ]
+
+    monkeypatch.setattr(cli.sources, "check_sources", fake_check_sources)
+
+    captured_focus = []
+
+    def fake_research(question, *, focus_urls=None):
+        captured_focus.append(focus_urls)
+        return {
+            "question": question, "tldr": ["A"], "tags": [],
+            "body_md": "## Neu", "sources": [{"url": "https://fresh.test", "title": "T"}],
+        }
+
+    monkeypatch.setattr(cli.agent, "research", fake_research)
+    monkeypatch.setattr(
+        cli.sources, "baseline_urls",
+        lambda urls: [{"etag": None, "last_modified": None, "content_sha256": "h"} for _ in urls],
+    )
+    monkeypatch.setattr(cli.render, "render_all", lambda: None)
+
+    cli.refresh()
+
+    assert captured_focus == [["https://stale.test"]]
+
+
+def test_refresh_force_focus_urls_all_sources(temp_db, monkeypatch):
+    tid = store.upsert_topic(slug="s1", question="Q?", tldr="A", body_md="b", tags="")
+    store.replace_sources(tid, [
+        {"url": "https://fresh.test", "etag": None, "last_modified": None, "content_sha256": "h1"},
+        {"url": "https://other.test", "etag": None, "last_modified": None, "content_sha256": "h2"},
+    ])
+
+    monkeypatch.setattr(
+        cli.sources, "check_sources",
+        lambda srcs: [
+            sources.FreshnessResult(
+                source_id=s.id, url=s.url, is_stale=False,
+                etag=s.etag, last_modified=s.last_modified, content_sha256=s.content_sha256,
+            )
+            for s in srcs
+        ],
+    )
+
+    captured_focus = []
+
+    def fake_research(question, *, focus_urls=None):
+        captured_focus.append(focus_urls)
+        return {
+            "question": question, "tldr": ["A"], "tags": [],
+            "body_md": "## Neu", "sources": [{"url": "https://fresh.test", "title": "T"}],
+        }
+
+    monkeypatch.setattr(cli.agent, "research", fake_research)
+    monkeypatch.setattr(
+        cli.sources, "baseline_urls",
+        lambda urls: [{"etag": None, "last_modified": None, "content_sha256": "h"} for _ in urls],
+    )
+    monkeypatch.setattr(cli.render, "render_all", lambda: None)
+
+    cli.refresh(force=True)
+
+    assert captured_focus == [["https://fresh.test", "https://other.test"]]
+
+
 # --- archive-topic / unarchive-topic --------------------------------------
 
 def test_archive_topic_cli(temp_db, monkeypatch, tmp_path):

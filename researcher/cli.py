@@ -158,13 +158,19 @@ def refresh(
         render.render_all()
         return
 
+    # Einmal je Topic laden und für Zählung/Freshness-Check/Re-Recherche wiederverwenden,
+    # statt store.get_sources(t.id) bis zu dreimal pro Topic abzufragen.
+    sources_by_topic = {t.id: store.get_sources(t.id) for t in topics}
+
     stale_topic_ids: set[int] = set()
-    typer.echo(f"› Prüfe {sum(len(store.get_sources(t.id)) for t in topics)} Quellen…")
+    stale_urls_by_topic: dict[int, list[str]] = {}
+    typer.echo(f"› Prüfe {sum(len(srcs) for srcs in sources_by_topic.values())} Quellen…")
     for t in topics:
-        srcs = store.get_sources(t.id)
+        srcs = sources_by_topic[t.id]
         if not srcs:
             continue
         results = sources.check_sources(srcs)
+        stale_urls_by_topic[t.id] = [r.url for r in results if r.is_stale]
         for r in results:
             store.update_source_freshness(
                 r.source_id,
@@ -187,8 +193,8 @@ def refresh(
 
     failed_slugs: list[str] = []
     for t in targets:
-        srcs = store.get_sources(t.id)
-        focus = [s.url for s in srcs if s.is_stale] if not force else [s.url for s in srcs]
+        srcs = sources_by_topic[t.id]
+        focus = stale_urls_by_topic.get(t.id, []) if not force else [s.url for s in srcs]
         typer.echo(f"› Re-Recherche: {t.slug}")
         try:
             payload = agent.research(t.question, focus_urls=focus)

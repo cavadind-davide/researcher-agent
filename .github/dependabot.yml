@@ -12,9 +12,19 @@ updates:
       - "dependencies"
       - "github-actions"
     groups:
-      pages-actions:
+      # Gleiches Muster wie bei python-minor-patch unten: Minor/Patch sicher
+      # buendeln, Major-Updates (potenziell brechende Aenderungen, siehe
+      # astral-sh/setup-uv@v10 heute - kein floating Major-Tag mehr ab v8,
+      # brach den Workflow bis zum Pin auf v10.0.1) bekommen automatisch
+      # einen eigenen, einzeln review-faehigen PR. Pattern bewusst auf "*"
+      # statt nur "actions/*" erweitert, damit auch Drittanbieter-Actions
+      # wie astral-sh/setup-uv erfasst sind.
+      actions-minor-patch:
         patterns:
-          - "actions/*"
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "uv"
     directory: "/"
@@ -28,6 +38,14 @@ updates:
       - "dependencies"
       - "python"
     groups:
-      pip:
+      # Minor/Patch sicher buendeln (uv.lock garantiert konsistente Aufloesung).
+      # Major-Updates matchen diese Gruppe bewusst NICHT (update-types
+      # beschraenkt auf minor/patch) und bekommen dadurch automatisch einen
+      # eigenen PR statt im Sammel-PR unterzugehen - API-Bruch-Risiko soll
+      # einzeln sichtbar und review-faehig bleiben.
+      python-minor-patch:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
