@@ -142,6 +142,22 @@ def test_filter_unseen_empty(temp_db):
     assert store.filter_unseen([]) == []
 
 
+def test_prune_seen_entries(temp_db):
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+
+    store.mark_seen(["https://old/1", "https://recent/1"])
+    old_ts = (datetime.now(timezone.utc) - timedelta(days=200)).isoformat(timespec="seconds")
+    conn = sqlite3.connect(store.DB_PATH)
+    conn.execute("UPDATE seen_entries SET seen_at = ? WHERE url = ?", (old_ts, "https://old/1"))
+    conn.commit()
+    conn.close()
+
+    deleted = store.prune_seen_entries(older_than_days=90)
+    assert deleted == 1
+    assert store.filter_unseen(["https://old/1", "https://recent/1"]) == ["https://old/1"]
+
+
 # --- Archivierung ---------------------------------------------------------
 
 def test_archive_and_unarchive_topic(temp_db):
