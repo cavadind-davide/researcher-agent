@@ -27,11 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup Python
-        uses: actions/setup-python@v7
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.12"
-          cache: pip
+          enable-cache: true
 
       - name: Setup Node.js (fuer Brave-Search-MCP via npx)
         uses: actions/setup-node@v7
@@ -39,10 +39,7 @@ jobs:
           node-version: "20"
 
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-lock.txt
-          pip install -e . --no-deps
+        run: uv sync --locked
 
       - name: Refresh research (re-recherchiert nur veraenderte Topics)
         # Einzelne Topics werden intern mit Retries behandelt (siehe researcher/agent.py);
@@ -54,7 +51,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
-        run: researcher refresh
+        run: uv run researcher refresh
 
       - name: Weekly security digest (Feeds scannen + Briefing erstellen)
         id: digest
@@ -64,9 +61,9 @@ jobs:
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
         run: |
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
-            researcher digest --force
+            uv run researcher digest --force
           else
-            researcher digest
+            uv run researcher digest
           fi
 
       - name: Warnung sichtbar machen, falls Refresh/Digest fehlgeschlagen sind

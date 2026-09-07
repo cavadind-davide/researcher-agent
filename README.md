@@ -147,15 +147,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v10.0.1
         with: { python-version: "3.12" }
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - run: pip install -r requirements-lock.txt -e . --no-deps
+      - run: uv sync --locked
       - env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
-        run: researcher refresh
+        run: uv run researcher refresh
       - uses: actions/upload-pages-artifact@v3
         with: { path: dist }
 

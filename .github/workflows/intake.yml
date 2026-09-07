@@ -50,12 +50,12 @@ jobs:
         if: steps.auth.outputs.authorized == 'true'
         uses: actions/checkout@v7
 
-      - name: Setup Python
+      - name: Setup uv
         if: steps.auth.outputs.authorized == 'true'
-        uses: actions/setup-python@v7
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.12"
-          cache: pip
+          enable-cache: true
 
       - name: Setup Node.js (für Brave-Search-MCP via npx)
         if: steps.auth.outputs.authorized == 'true'
@@ -65,10 +65,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.auth.outputs.authorized == 'true'
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-lock.txt
-          pip install -e . --no-deps
+        run: uv sync --locked
 
       - name: Intake ausführen
         id: run
@@ -79,7 +76,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
         run: |
-          if researcher intake > intake_output.txt 2>&1; then
+          if uv run researcher intake > intake_output.txt 2>&1; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "ok=false" >> "$GITHUB_OUTPUT"
@@ -92,7 +89,7 @@ jobs:
       - name: Rendern + Änderungen committen
         if: steps.auth.outputs.authorized == 'true' && steps.run.outputs.ok == 'true'
         run: |
-          researcher render-only
+          uv run researcher render-only
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/researcher.sqlite researcher/feeds.json
