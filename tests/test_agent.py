@@ -377,7 +377,7 @@ def test_research_run_uses_sonnet_restricted_tools_and_budget(monkeypatch):
     assert "mcp__brave-search__brave_web_search" in opts.allowed_tools
 
 
-def test_digest_run_uses_haiku_without_tools(monkeypatch):
+def test_digest_run_uses_sonnet_without_tools(monkeypatch):
     monkeypatch.delenv("RESEARCHER_DIGEST_MODEL", raising=False)
     captured = []
     monkeypatch.setattr(agent, "query", _capturing_query(captured))
@@ -385,7 +385,7 @@ def test_digest_run_uses_haiku_without_tools(monkeypatch):
     asyncio.run(agent._run_digest_agent("# Kandidaten"))
 
     opts = captured[0]
-    assert opts.model == "haiku"
+    assert opts.model == "sonnet"
     assert opts.tools == []
     assert opts.mcp_servers == {}
     assert opts.max_turns == agent.DIGEST_MAX_TURNS

@@ -111,7 +111,7 @@ Schwellen.
 | Stellschraube | Standard | Überschreiben |
 | --- | --- | --- |
 | Modell Recherche | `sonnet` | `RESEARCHER_MODEL` |
-| Modell Briefing | `haiku` | `RESEARCHER_DIGEST_MODEL` |
+| Modell Briefing | `sonnet` | `RESEARCHER_DIGEST_MODEL` |
 | Kostendeckel je Recherche | 3.0 USD | `RESEARCHER_MAX_BUDGET_USD` |
 | Kostendeckel Briefing | 1.0 USD | `RESEARCHER_DIGEST_MAX_BUDGET_USD` |
 | Max. Agent-Runden | 12 (Recherche) / 3 (Briefing) | `agent.py` |
