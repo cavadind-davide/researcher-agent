@@ -50,3 +50,20 @@ def allowed_tools() -> list[str]:
         "mcp__microsoft-learn__microsoft_docs_fetch",
         "WebFetch",
     ]
+
+
+def disallowed_tools() -> list[str]:
+    """Brave-MCP-Tools, die der Agent nicht braucht.
+
+    Jede Tool-Definition wird bei jeder Agent-Runde mitgeschickt und kostet
+    Tokens. Gesperrte Tools entfernt die CLI aus dem Kontext. Die Namen
+    entsprechen ``@brave/brave-search-mcp-server@2.1.3`` (siehe Pin oben).
+    """
+    return [
+        "mcp__brave-search__brave_image_search",
+        "mcp__brave-search__brave_video_search",
+        "mcp__brave-search__brave_local_search",
+        "mcp__brave-search__brave_place_search",
+        "mcp__brave-search__brave_summarizer",
+        "mcp__brave-search__brave_llm_context",
+    ]

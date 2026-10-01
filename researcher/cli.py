@@ -5,6 +5,7 @@ import http.server
 import os
 import socketserver
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
@@ -36,6 +37,25 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 load_dotenv()
+
+# Schwellen für eine (teure) Re-Recherche im regulären Refresh. Viele Quellen
+# ändern sich jede Woche geringfügig (Sidebar, Datum, "verwandte Artikel") – ohne
+# Schwelle wurde dadurch jedes Topic jede Woche komplett neu recherchiert.
+MIN_STALE_SOURCES = 3
+MIN_REFRESH_AGE_DAYS = 14
+
+
+def _days_since(iso_ts: str | None) -> float:
+    if not iso_ts:
+        return float("inf")
+    try:
+        dt = datetime.fromisoformat(iso_ts)
+    except ValueError:
+        return float("inf")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - dt).total_seconds() / 86400
+
 
 app = typer.Typer(
     add_completion=False,
@@ -121,6 +141,21 @@ def refresh(
             "Einmalig nach einem Wechsel des Frische-Hash-Algorithmus nutzen.",
         ),
     ] = False,
+    min_stale: Annotated[
+        int,
+        typer.Option(
+            "--min-stale",
+            help="Re-Recherche erst ab so vielen veränderten Quellen je Topic "
+            "(werden über mehrere Läufe aufsummiert).",
+        ),
+    ] = MIN_STALE_SOURCES,
+    min_age_days: Annotated[
+        int,
+        typer.Option(
+            "--min-age-days",
+            help="Re-Recherche frühestens so viele Tage nach der letzten Recherche.",
+        ),
+    ] = MIN_REFRESH_AGE_DAYS,
 ) -> None:
     """Prüfe Quellen auf Aktualisierungen und re-recherchiere veränderte Topics."""
     store.init_db()
@@ -170,24 +205,46 @@ def refresh(
         if not srcs:
             continue
         results = sources.check_sources(srcs)
-        stale_urls_by_topic[t.id] = [r.url for r in results if r.is_stale]
+        # "stale" bleibt bis zur nächsten Re-Recherche erhalten (mark_topic_refreshed
+        # bzw. replace_sources setzen es zurück). So summieren sich Änderungen über
+        # mehrere Wochen auf, obwohl der Hash jedes Mal aufgefrischt wird.
+        was_stale = {s.id: s.is_stale for s in srcs}
+        stale_urls: list[str] = []
         for r in results:
+            is_stale = r.is_stale or was_stale.get(r.source_id, False)
             store.update_source_freshness(
                 r.source_id,
                 etag=r.etag,
                 last_modified=r.last_modified,
                 content_sha256=r.content_sha256,
-                is_stale=r.is_stale,
+                is_stale=is_stale,
             )
             if r.error:
                 typer.secho(f"  ⚠ {r.url}: {r.error}", fg="yellow")
             elif r.is_stale:
                 typer.secho(f"  ↻ stale: {r.url}", fg="yellow")
-                stale_topic_ids.add(t.id)
+            if is_stale:
+                stale_urls.append(r.url)
+        stale_urls_by_topic[t.id] = stale_urls
+        if not stale_urls:
+            continue
+        age = _days_since(t.last_refreshed_at)
+        if len(stale_urls) < min_stale:
+            typer.echo(
+                f"  · {t.slug}: {len(stale_urls)}/{len(srcs)} Quelle(n) verändert "
+                f"(< {min_stale}) – keine Re-Recherche."
+            )
+        elif age < min_age_days:
+            typer.echo(
+                f"  · {t.slug}: zuletzt vor {age:.0f} Tag(en) recherchiert "
+                f"(< {min_age_days}) – Re-Recherche später."
+            )
+        else:
+            stale_topic_ids.add(t.id)
 
     targets = [t for t in topics if t.id in stale_topic_ids] if not force else topics
     if not targets:
-        typer.echo("✓ Alle Quellen aktuell – keine Re-Recherche nötig.")
+        typer.echo("✓ Keine Re-Recherche nötig.")
         render.render_all()
         return
 

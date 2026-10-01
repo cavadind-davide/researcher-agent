@@ -63,6 +63,7 @@ researcher serve
 | `researcher refresh`              | Prüft alle Quellen auf Aktualisierungen, re-recherchiert stale Topics. |
 | `researcher refresh --topic <slug>` | Nur dieses Topic.                                                     |
 | `researcher refresh --force`      | Erzwingt Re-Recherche aller Topics.                                   |
+| `researcher refresh --min-stale 3 --min-age-days 14` | Schwellen für die Re-Recherche (Standardwerte). |
 | `researcher list`                 | Listet alle gespeicherten Topics.                                     |
 | `researcher serve [--port 8000]`  | Lokale HTTP-Vorschau aus `dist/`.                                     |
 | `researcher render-only`          | Rendert nur HTML neu (ohne Netzwerkzugriff).                          |
@@ -98,8 +99,28 @@ sowie einen SHA-256-Hash des Body. Diese Werte landen in `data/researcher.sqlite
 2. Bei `200` wird stattdessen ein normalisierter Inhalts-Hash (SHA-256, bei
    HTML/XML ohne Skripte/Styles/Tags) mit dem gespeicherten Wert verglichen.
 
-Topics, deren Quellen verändert wurden, werden vom Agent erneut bearbeitet —
-nur diese Quellen werden im System-Prompt als Fokus übergeben.
+Ein Topic wird erst dann vom Agent erneut bearbeitet, wenn **mindestens 3 seiner
+Quellen** verändert sind (`--min-stale`) **und** die letzte Recherche **mindestens
+14 Tage** zurückliegt (`--min-age-days`). Veränderte Quellen werden bis zur
+nächsten Re-Recherche gemerkt und über mehrere Läufe aufsummiert. Nur diese
+Quellen werden im System-Prompt als Fokus übergeben. `--force` ignoriert die
+Schwellen.
+
+## Token-Verbrauch & Kosten
+
+| Stellschraube | Standard | Überschreiben |
+| --- | --- | --- |
+| Modell Recherche | `sonnet` | `RESEARCHER_MODEL` |
+| Modell Briefing | `haiku` | `RESEARCHER_DIGEST_MODEL` |
+| Kostendeckel je Recherche | 2.0 USD | `RESEARCHER_MAX_BUDGET_USD` |
+| Kostendeckel Briefing | 0.5 USD | `RESEARCHER_DIGEST_MAX_BUDGET_USD` |
+| Max. Agent-Runden | 12 (Recherche) / 3 (Briefing) | `agent.py` |
+| Kandidaten je Feed | 8 | `digest.py` (`MAX_PER_FEED`) |
+
+- Die Recherche bekommt nur die nötigen Werkzeuge (`WebFetch`, Brave Web/News, MS Learn);
+  das Briefing läuft ganz ohne Werkzeuge und wertet nur Titel und Auszug aus.
+- Ein Lauf, der seinen Kostendeckel überschreitet, wird abgebrochen und **nicht** wiederholt.
+- Jeder Agent-Lauf schreibt seinen Verbrauch ins Log (`ⓘ Verbrauch [recherche|briefing]: …`).
 
 ## Struktur
 

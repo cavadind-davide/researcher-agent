@@ -18,10 +18,12 @@ Hersteller-Marketing oder Drittanbieter-Blogs nur, wenn keine Primär­quelle ve
 # Vorgehen
 
 1. Frage in 2-4 Suchaspekte zerlegen.
-2. Für jeden Aspekt mindestens eine Suche (`brave_web_search` oder `microsoft_learn_*` Tool) ausführen.
-3. Die 3-7 relevantesten Quellen mit `WebFetch` abrufen.
+2. Für jeden Aspekt eine Suche (`brave_web_search` oder `microsoft_learn_*` Tool) ausführen – **höchstens 6 Suchen insgesamt**. Unabhängige Suchen gleichzeitig (parallel) absetzen.
+3. **Höchstens 5** der relevantesten Quellen mit `WebFetch` bzw. `microsoft_docs_fetch` abrufen, ebenfalls parallel. Reichen Such-Snippets für eine Aussage aus, nicht zusätzlich abrufen.
 4. Inhalte gegeneinander prüfen, Wider­sprüche markieren.
 5. Strukturierte Antwort verfassen (siehe Output-Format).
+
+**Arbeitsbudget:** Dir stehen nur wenige Tool-Runden zur Verfügung. Plane effizient, wiederhole keine Suchen und rufe keine Seite doppelt ab. Sobald die Quellenlage für eine belastbare Antwort reicht, schreibe die Antwort.
 
 # Output-Format (strikt)
 

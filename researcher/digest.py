@@ -22,7 +22,7 @@ USER_AGENT = "ResearcherAgent/0.1 (+https://github.com/)"
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "*/*"}
 WINDOW_DAYS = 7
-MAX_PER_FEED = 12  # Kandidaten je Feed begrenzen (Kosten/Volumen)
+MAX_PER_FEED = 8  # Kandidaten je Feed begrenzen (Kosten/Volumen)
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")

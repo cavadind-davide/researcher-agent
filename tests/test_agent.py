@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from claude_agent_sdk import CLINotFoundError, ProcessError
+from claude_agent_sdk import CLINotFoundError, ProcessError, ResultMessage
 
 from researcher import agent
 
@@ -344,3 +344,80 @@ def test_research_system_prompt_includes_org_context_and_focus():
     assert "IT-Sicherheitsarchitekt" in sp    # aus dem Recherche-Basis-Prompt
     assert "Einsatzkontext" in sp             # Org-Kontext angehängt
     assert "https://focus/1" in sp            # Fokus-Quelle eingebettet
+
+
+# --- Token-/Kostensteuerung ----------------------------------------------------
+
+def _capturing_query(captured, *, subtype="success"):
+    async def _query(*, prompt, options):
+        captured.append(options)
+        yield ResultMessage(
+            subtype=subtype, duration_ms=1, duration_api_ms=1, is_error=subtype != "success",
+            num_turns=1, session_id="s", total_cost_usd=0.01,
+            usage={"input_tokens": 10, "output_tokens": 5},
+        )
+
+    return _query
+
+
+def test_research_run_uses_sonnet_restricted_tools_and_budget(monkeypatch):
+    monkeypatch.delenv("RESEARCHER_MODEL", raising=False)
+    monkeypatch.delenv("RESEARCHER_MAX_BUDGET_USD", raising=False)
+    captured = []
+    monkeypatch.setattr(agent, "query", _capturing_query(captured))
+
+    asyncio.run(agent._run_agent("Frage"))
+
+    opts = captured[0]
+    assert opts.model == "sonnet"
+    assert opts.tools == ["WebFetch"]  # keine Bash/Read/Edit-Definitionen im Kontext
+    assert opts.max_turns == agent.RESEARCH_MAX_TURNS
+    assert opts.max_budget_usd == agent.DEFAULT_RESEARCH_BUDGET_USD
+    assert "mcp__brave-search__brave_image_search" in opts.disallowed_tools
+    assert "mcp__brave-search__brave_web_search" in opts.allowed_tools
+
+
+def test_digest_run_uses_haiku_without_tools(monkeypatch):
+    monkeypatch.delenv("RESEARCHER_DIGEST_MODEL", raising=False)
+    captured = []
+    monkeypatch.setattr(agent, "query", _capturing_query(captured))
+
+    asyncio.run(agent._run_digest_agent("# Kandidaten"))
+
+    opts = captured[0]
+    assert opts.model == "haiku"
+    assert opts.tools == []
+    assert opts.mcp_servers == {}
+    assert opts.max_turns == agent.DIGEST_MAX_TURNS
+
+
+def test_models_and_budget_overridable_via_env(monkeypatch):
+    monkeypatch.setenv("RESEARCHER_MODEL", "opus")
+    monkeypatch.setenv("RESEARCHER_MAX_BUDGET_USD", "3.5")
+    captured = []
+    monkeypatch.setattr(agent, "query", _capturing_query(captured))
+
+    asyncio.run(agent._run_agent("Frage"))
+
+    assert captured[0].model == "opus"
+    assert captured[0].max_budget_usd == 3.5
+
+
+def test_budget_exceeded_is_not_retried(monkeypatch):
+    calls = []
+
+    async def fake(question, *, focus_urls=None):
+        calls.append(question)
+        raise agent.AgentBudgetExceeded("Budget überschritten")
+
+    monkeypatch.setattr(agent, "_run_agent", fake)
+    with pytest.raises(agent.AgentBudgetExceeded):
+        agent.research("Frage")
+    assert len(calls) == 1
+
+
+def test_run_query_raises_on_budget_result(monkeypatch, capsys):
+    monkeypatch.setattr(agent, "query", _capturing_query([], subtype="error_max_budget_usd"))
+    with pytest.raises(agent.AgentBudgetExceeded):
+        asyncio.run(agent._run_query("Frage", "System", max_budget_usd=1.0))
+    assert "Verbrauch" in capsys.readouterr().err  # Verbrauch wird trotzdem geloggt
