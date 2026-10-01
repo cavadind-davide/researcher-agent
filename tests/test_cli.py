@@ -288,6 +288,22 @@ def test_refresh_force_ignores_thresholds(temp_db, monkeypatch):
     assert researched == ["t?"]
 
 
+def test_refresh_aborts_on_account_error(temp_db, monkeypatch):
+    _make_topic_with_sources("a", 3, age_days=30)
+    _make_topic_with_sources("b", 3, age_days=30)
+    _patch_refresh(monkeypatch, set())
+    calls = []
+
+    def fake_research(question, *, focus_urls=None):
+        calls.append(question)
+        raise agent.AgentAccountError("Credit balance is too low")
+
+    monkeypatch.setattr(cli.agent, "research", fake_research)
+    with pytest.raises(agent.AgentAccountError):
+        cli.refresh(force=True)
+    assert len(calls) == 1  # zweites Topic wird gar nicht erst versucht
+
+
 # --- archive-topic / unarchive-topic --------------------------------------
 
 def test_archive_topic_cli(temp_db, monkeypatch, tmp_path):

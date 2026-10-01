@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from claude_agent_sdk import CLINotFoundError, ProcessError, ResultMessage
+from claude_agent_sdk import CLINotFoundError, ProcessError, ResultError, ResultMessage
 
 from researcher import agent
 
@@ -421,3 +421,52 @@ def test_run_query_raises_on_budget_result(monkeypatch, capsys):
     with pytest.raises(agent.AgentBudgetExceeded):
         asyncio.run(agent._run_query("Frage", "System", max_budget_usd=1.0))
     assert "Verbrauch" in capsys.readouterr().err  # Verbrauch wird trotzdem geloggt
+
+
+# --- Fehler-Results der CLI (ResultError) -----------------------------------
+
+def _result_error_query(data):
+    async def _query(*, prompt, options):
+        raise ResultError("Claude Code returned an error result: " + str(data.get("result")), data=data, exit_code=1)
+        yield  # pragma: no cover
+
+    return _query
+
+
+def test_credit_balance_error_is_account_error(monkeypatch):
+    monkeypatch.setattr(agent, "query", _result_error_query(
+        {"subtype": "success", "is_error": True, "api_error_status": 400,
+         "result": "Credit balance is too low"}
+    ))
+    with pytest.raises(agent.AgentAccountError):
+        asyncio.run(agent._run_query("Frage", "System"))
+
+
+def test_budget_result_error_becomes_budget_exceeded(monkeypatch):
+    monkeypatch.setattr(agent, "query", _result_error_query(
+        {"subtype": "error_max_budget_usd", "is_error": True}
+    ))
+    with pytest.raises(agent.AgentBudgetExceeded):
+        asyncio.run(agent._run_query("Frage", "System", max_budget_usd=1.0))
+
+
+def test_other_result_errors_stay_retryable(monkeypatch):
+    monkeypatch.setattr(agent, "query", _result_error_query(
+        {"subtype": "success", "is_error": True, "api_error_status": 529, "result": "Overloaded"}
+    ))
+    with pytest.raises(ResultError) as exc_info:
+        asyncio.run(agent._run_query("Frage", "System"))
+    assert isinstance(exc_info.value, agent._RETRYABLE_ERRORS)
+
+
+def test_account_error_is_not_retried(monkeypatch):
+    calls = []
+
+    async def fake(candidates_block):
+        calls.append(1)
+        raise agent.AgentAccountError("Credit balance is too low")
+
+    monkeypatch.setattr(agent, "_run_digest_agent", fake)
+    with pytest.raises(agent.AgentAccountError):
+        agent.summarize_digest([{"url": "https://x.test", "title": "T"}])
+    assert len(calls) == 1

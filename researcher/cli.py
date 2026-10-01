@@ -255,8 +255,8 @@ def refresh(
         typer.echo(f"› Re-Recherche: {t.slug}")
         try:
             payload = agent.research(t.question, focus_urls=focus)
-        except agent.CLINotFoundError:
-            raise  # Konfigurationsfehler betrifft alle Topics gleichermassen
+        except (agent.CLINotFoundError, agent.AgentAccountError):
+            raise  # Konfigurations-/Kontofehler betrifft alle Topics gleichermassen
         except Exception as exc:
             # Ein einzelnes Topic, das auch nach den internen Retries in
             # agent.research() noch scheitert, soll nicht den ganzen Lauf (und
