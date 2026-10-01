@@ -1,6 +1,8 @@
 """Tests für CLI-Hilfsfunktionen: URL-Safety und Persistenz-Filter."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 import typer
 
@@ -103,7 +105,7 @@ def test_refresh_isolates_topic_failures(temp_db, monkeypatch):
     monkeypatch.setattr(cli.render, "render_all", lambda: rendered.append(True))
 
     with pytest.raises(typer.Exit):
-        cli.refresh()
+        cli.refresh(min_stale=1, min_age_days=0)
 
     assert rendered == [True]  # trotz gescheitertem Topic wird weiterhin gerendert (und damit deployt)
     assert store.get_topic("ok").body_md == "## Neu"  # erfolgreiches Topic wurde persistiert
@@ -148,7 +150,7 @@ def test_refresh_focus_urls_only_stale_sources(temp_db, monkeypatch):
     )
     monkeypatch.setattr(cli.render, "render_all", lambda: None)
 
-    cli.refresh()
+    cli.refresh(min_stale=1, min_age_days=0)
 
     assert captured_focus == [["https://stale.test"]]
 
@@ -190,6 +192,100 @@ def test_refresh_force_focus_urls_all_sources(temp_db, monkeypatch):
     cli.refresh(force=True)
 
     assert captured_focus == [["https://fresh.test", "https://other.test"]]
+
+
+# --- refresh: Schwellen gegen wöchentliche Voll-Recherche aller Topics ------
+
+def _make_topic_with_sources(slug, n, *, age_days):
+    tid = store.upsert_topic(slug=slug, question=f"{slug}?", tldr="A", body_md="b", tags="")
+    store.replace_sources(tid, [
+        {"url": f"https://{slug}-{i}.test", "etag": None, "last_modified": None, "content_sha256": f"h{i}"}
+        for i in range(n)
+    ])
+    ts = (datetime.now(timezone.utc) - timedelta(days=age_days)).isoformat(timespec="seconds")
+    with store.connect() as conn:
+        conn.execute("UPDATE topics SET last_refreshed_at = ? WHERE id = ?", (ts, tid))
+    return tid
+
+
+def _patch_refresh(monkeypatch, stale_urls):
+    monkeypatch.setattr(
+        cli.sources, "check_sources",
+        lambda srcs: [
+            sources.FreshnessResult(
+                source_id=s.id, url=s.url, is_stale=(s.url in stale_urls),
+                etag=s.etag, last_modified=s.last_modified, content_sha256=s.content_sha256,
+            )
+            for s in srcs
+        ],
+    )
+    monkeypatch.setattr(
+        cli.sources, "baseline_urls",
+        lambda urls: [{"etag": None, "last_modified": None, "content_sha256": "h"} for _ in urls],
+    )
+    monkeypatch.setattr(cli.render, "render_all", lambda: None)
+    researched = []
+
+    def fake_research(question, *, focus_urls=None):
+        researched.append(question)
+        return {
+            "question": question, "tldr": ["A"], "tags": [],
+            "body_md": "## Neu", "sources": [{"url": "https://neu.test", "title": "T"}],
+        }
+
+    monkeypatch.setattr(cli.agent, "research", fake_research)
+    return researched
+
+
+def test_refresh_skips_topic_below_min_stale(temp_db, monkeypatch):
+    _make_topic_with_sources("t", 10, age_days=30)
+    researched = _patch_refresh(monkeypatch, {"https://t-0.test", "https://t-1.test"})
+
+    cli.refresh(min_stale=3, min_age_days=14)
+
+    assert researched == []
+
+
+def test_refresh_skips_recently_refreshed_topic(temp_db, monkeypatch):
+    _make_topic_with_sources("t", 10, age_days=7)
+    researched = _patch_refresh(monkeypatch, {f"https://t-{i}.test" for i in range(5)})
+
+    cli.refresh(min_stale=3, min_age_days=14)
+
+    assert researched == []
+
+
+def test_refresh_researches_when_thresholds_met(temp_db, monkeypatch):
+    _make_topic_with_sources("t", 10, age_days=30)
+    researched = _patch_refresh(monkeypatch, {f"https://t-{i}.test" for i in range(3)})
+
+    cli.refresh(min_stale=3, min_age_days=14)
+
+    assert researched == ["t?"]
+
+
+def test_refresh_accumulates_stale_sources_across_runs(temp_db, monkeypatch):
+    tid = _make_topic_with_sources("t", 10, age_days=30)
+
+    # Woche 1: zwei Quellen verändert → unter Schwelle, aber gemerkt.
+    researched = _patch_refresh(monkeypatch, {"https://t-0.test", "https://t-1.test"})
+    cli.refresh(min_stale=3, min_age_days=14)
+    assert researched == []
+    assert sum(s.is_stale for s in store.get_sources(tid)) == 2
+
+    # Woche 2: eine weitere Quelle verändert → 3 aufsummiert → Re-Recherche.
+    researched = _patch_refresh(monkeypatch, {"https://t-2.test"})
+    cli.refresh(min_stale=3, min_age_days=14)
+    assert researched == ["t?"]
+
+
+def test_refresh_force_ignores_thresholds(temp_db, monkeypatch):
+    _make_topic_with_sources("t", 10, age_days=1)
+    researched = _patch_refresh(monkeypatch, set())
+
+    cli.refresh(force=True)
+
+    assert researched == ["t?"]
 
 
 # --- archive-topic / unarchive-topic --------------------------------------
