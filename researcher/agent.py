@@ -102,8 +102,8 @@ DEFAULT_DIGEST_MODEL = "haiku"
 RESEARCH_MAX_TURNS = 12
 DIGEST_MAX_TURNS = 3
 # Harte Kostendeckel pro Lauf (USD) als Sicherheitsnetz gegen ausufernde Läufe.
-DEFAULT_RESEARCH_BUDGET_USD = 2.0
-DEFAULT_DIGEST_BUDGET_USD = 0.5
+DEFAULT_RESEARCH_BUDGET_USD = 3.0
+DEFAULT_DIGEST_BUDGET_USD = 1.0
 
 
 def _env_float(name: str, default: float) -> float:

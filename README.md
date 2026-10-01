@@ -112,8 +112,8 @@ Schwellen.
 | --- | --- | --- |
 | Modell Recherche | `sonnet` | `RESEARCHER_MODEL` |
 | Modell Briefing | `haiku` | `RESEARCHER_DIGEST_MODEL` |
-| Kostendeckel je Recherche | 2.0 USD | `RESEARCHER_MAX_BUDGET_USD` |
-| Kostendeckel Briefing | 0.5 USD | `RESEARCHER_DIGEST_MAX_BUDGET_USD` |
+| Kostendeckel je Recherche | 3.0 USD | `RESEARCHER_MAX_BUDGET_USD` |
+| Kostendeckel Briefing | 1.0 USD | `RESEARCHER_DIGEST_MAX_BUDGET_USD` |
 | Max. Agent-Runden | 12 (Recherche) / 3 (Briefing) | `agent.py` |
 | Kandidaten je Feed | 8 | `digest.py` (`MAX_PER_FEED`) |
 
