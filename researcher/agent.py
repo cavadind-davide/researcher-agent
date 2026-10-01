@@ -16,6 +16,7 @@ from claude_agent_sdk import (
     CLIConnectionError,
     CLINotFoundError,
     ProcessError,
+    ResultError,
     ResultMessage,
     TextBlock,
     query,
@@ -130,6 +131,31 @@ class AgentBudgetExceeded(RuntimeError):
     NICHT retrybar: ein Retry würde dasselbe Budget erneut verbrauchen."""
 
 
+class AgentAccountError(RuntimeError):
+    """Konto-/Zugangsproblem bei der API (Guthaben aufgebraucht, ungültiger oder
+    gesperrter API-Key). NICHT retrybar: ein Retry scheitert garantiert gleich."""
+
+
+_ACCOUNT_ERROR_MARKERS = ("credit balance", "invalid x-api-key", "authentication_error")
+
+
+def _classify_result_error(exc: ResultError, max_budget_usd: float | None, label: str) -> Exception:
+    """Ordne einen vom CLI gemeldeten Fehler-Result einem nicht-retrybaren Typ
+    zu – oder gib ihn unverändert (retrybar, als ProcessError) zurück.
+
+    Die CLI meldet z. B. ein überschrittenes Budget oder ein leeres Guthaben als
+    Result-Message mit ``is_error`` und beendet sich danach mit Exit-Code 1; das
+    SDK wirft dann ``ResultError`` statt die Message normal zu liefern."""
+    if exc.subtype == "error_max_budget_usd":
+        return AgentBudgetExceeded(
+            f"Kostenbudget von {max_budget_usd} USD überschritten ({label}) – Lauf abgebrochen."
+        )
+    text = " ".join([str(exc), exc.result or "", *exc.errors]).lower()
+    if exc.api_error_status in (401, 403) or any(m in text for m in _ACCOUNT_ERROR_MARKERS):
+        return AgentAccountError(f"API-Konto-Fehler ({label}): {exc}")
+    return exc
+
+
 def _log_usage(label: str, result: ResultMessage) -> None:
     """Token-Verbrauch und Kosten eines Laufs ins (CI-)Log schreiben, damit
     Einsparungen messbar bleiben."""
@@ -188,6 +214,11 @@ async def _run_query(
                         final_text = block.text
             elif isinstance(msg, ResultMessage):
                 result = msg
+    except ResultError as exc:
+        classified = _classify_result_error(exc, max_budget_usd, label)
+        if classified is exc:
+            raise
+        raise classified from exc
     except (CLINotFoundError, CLIConnectionError, ProcessError):
         raise
     except Exception as exc:
