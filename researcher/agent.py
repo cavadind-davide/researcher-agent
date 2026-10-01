@@ -95,9 +95,9 @@ def _stderr_sink(tail: deque[str]):
 # --- Kosten-/Token-Steuerung ---------------------------------------------
 # Modelle per Umgebungsvariable überschreibbar (Alias wie "sonnet"/"haiku" oder
 # volle Modell-ID). Recherche braucht Tiefe → Sonnet; das Briefing wählt nur aus
-# vorgegebenen Kandidaten aus → Haiku reicht und ist deutlich günstiger.
+# vorgegebenen Kandidaten aus, braucht aber strikte Faktentreue → ebenfalls Sonnet.
 DEFAULT_RESEARCH_MODEL = "sonnet"
-DEFAULT_DIGEST_MODEL = "haiku"
+DEFAULT_DIGEST_MODEL = "sonnet"
 # Jede Agent-Runde schickt den kompletten bisherigen Verlauf erneut mit – die
 # Rundenzahl ist daher der größte Hebel für den Token-Verbrauch.
 RESEARCH_MAX_TURNS = 12
