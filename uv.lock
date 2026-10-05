@@ -142,7 +142,7 @@ wheels = [
 
 [[package]]
 name = "claude-agent-sdk"
-version = "0.2.152"
+version = "0.2.163"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -150,13 +150,12 @@ dependencies = [
     { name = "mcp" },
     { name = "sniffio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/49/61/de2194d266fcede2a737996e800e7726079730f81ef03d41117e7888be04/claude_agent_sdk-0.2.152.tar.gz", hash = "sha256:0822bbdf700ccdd1acecf8365345a56bde07833afe7f8bd1bee68cba0e2fcf9a", size = 344710, upload-time = "2026-09-02T22:47:58.633Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9b/74/635d38e2ef813a2d1ba4ff7f3de736c35ee3bce9ebf4a5b7e89f3293604f/claude_agent_sdk-0.2.163.tar.gz", hash = "sha256:269821ad5acff5967522ff15f444b0598840fd9bdc45c645de569a5478061a53", size = 365180, upload-time = "2026-09-30T19:46:37.125Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/d3/ee2b674958e105cf26a2eb4d512c46b02fcfdc8fadbb14dde750bbfaf9b1/claude_agent_sdk-0.2.152-py3-none-macosx_11_0_arm64.whl", hash = "sha256:6cc1e949743c7634274ae526bfd1c0a216ff9d71c6b36d94cab80f32b0d32b4c", size = 85989333, upload-time = "2026-09-02T22:48:02.484Z" },
-    { url = "https://files.pythonhosted.org/packages/92/c4/6564671e6d303012b5c0bd6650b9977317c3b5c83914cf5ac62068fa85e6/claude_agent_sdk-0.2.152-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:9c79c4ef91b15e5fae6aba62a82afb983dc360bc159902c541046227e2852c86", size = 90503485, upload-time = "2026-09-02T22:48:06.357Z" },
-    { url = "https://files.pythonhosted.org/packages/13/5d/1efd9e3332d2909e015c6571a4b5ed937e9126b9c702217813247c1c8052/claude_agent_sdk-0.2.152-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:1e5b619e6fa3c98f06ddc107652f7820c4573fb73a9a24263568d9974078bbc2", size = 95850705, upload-time = "2026-09-02T22:48:10.493Z" },
-    { url = "https://files.pythonhosted.org/packages/95/a0/f921e52fdbfd400e46fbc1e707e6004a3ef99ace6cb4555429a3a8d3f371/claude_agent_sdk-0.2.152-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:f885bd935054082a599dcf92bbdaf3c0b853117a79375cb3aae74674a8124326", size = 96039825, upload-time = "2026-09-02T22:48:14.587Z" },
-    { url = "https://files.pythonhosted.org/packages/e6/be/dd113754761c6eef6eec1f2b148c825f925d4bfaa3f946656925239c54f9/claude_agent_sdk-0.2.152-py3-none-win_amd64.whl", hash = "sha256:f422c256358997ffa3a740f9fdc8127aa8404a9d57493502dc7d2ac05ecb5486", size = 98656506, upload-time = "2026-09-02T22:48:19.109Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/48/bd56b852692a99939384c25ae6bbcbd6e9017ce5becf28c1e00d8ce83c24/claude_agent_sdk-0.2.163-py3-none-macosx_11_0_arm64.whl", hash = "sha256:b025dcc3f9c52779bcd9e9c088b1a587d96afbffb8355b5d3053850796735ede", size = 93359293, upload-time = "2026-09-30T19:46:40.568Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/c0/73f36a7435037ae06541be0fd6fdfe4f3270e6fd958a4523ee1c90e2737d/claude_agent_sdk-0.2.163-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:e10d48657f01cc53801cdd8ec3d0a6c8c680b82da083da42493f82feb99d04e6", size = 97793458, upload-time = "2026-09-30T19:46:44.773Z" },
+    { url = "https://files.pythonhosted.org/packages/13/c7/d8fbc84fa75b79f5a57af1595a79b0a392844fcb192aad09ef8c646b6c85/claude_agent_sdk-0.2.163-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:e3be00eeb9fc156a3308a2e8fb58390768fdcb2ff16683fac385b4d98e99233c", size = 102851414, upload-time = "2026-09-30T19:46:48.947Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/ea/fc2a0a4e27c8ccfdbc77344298842adcbb6de03d4cdbae5793ff659b00e0/claude_agent_sdk-0.2.163-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:260cb955d237b7e1897f1dbf9ee5efbf815d8622d0c7459a05409c56432d8501", size = 103197060, upload-time = "2026-09-30T19:46:53.144Z" },
 ]
 
 [[package]]
@@ -356,11 +355,11 @@ wheels = [
 
 [[package]]
 name = "json-repair"
-version = "0.63.4"
+version = "0.63.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/62/72/4ec122befe7c2091ba7370d985cf0a3d4dbeccc2f832898ddb7921b4ab94/json_repair-0.63.4.tar.gz", hash = "sha256:77aa642193d62b02b889e8ce0df33898d3ea87282f0b9d8653f8ce8772c642b4", size = 52906, upload-time = "2026-08-25T07:39:02.725Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/29/653c36e0de80f7048f01298a9098f1c66bb9da162e92ad6a6e2c3202cc52/json_repair-0.63.5.tar.gz", hash = "sha256:75a6a1a4ea954935dd3fb69b6e49ac0e3e3d69b4290127a0c8d37af93b709f3a", size = 52945, upload-time = "2026-09-22T18:36:08.745Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/ea/1a7b47196b0d03f59a80f5218b2a34160587c84ca8b0bcb56cb4ee93834e/json_repair-0.63.4-py3-none-any.whl", hash = "sha256:0f374f3eee21454aef0a5d72c06b8689b660a1788f80ab392639e3f7d5c5d458", size = 51295, upload-time = "2026-08-25T07:39:01.259Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/a4/222e2581667c326183a87df229e772140fbf3e5dc03ec73e2a0e74804114/json_repair-0.63.5-py3-none-any.whl", hash = "sha256:0e39b3066f7829b4bd7fc614e463cfd4ff7a4c46f82f5b65431fc11e29a74c81", size = 51334, upload-time = "2026-09-22T18:36:07.05Z" },
 ]
 
 [[package]]
@@ -682,11 +681,11 @@ wheels = [
 
 [[package]]
 name = "python-dotenv"
-version = "1.2.3"
+version = "1.2.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6a/53/ed9d74092561d4b01a2ef1349d52cdbc135e526c245f366b089cfca6de49/python_dotenv-1.2.3.tar.gz", hash = "sha256:a20a594dabeaa385725aa239d5244871c143ecb356add8a20fcf23773a6c3a35", size = 58945, upload-time = "2026-08-16T16:54:54.067Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/26/2fbeedb218a787a5eea551c7532cac4e009f83d689dd2faa0d0353473f86/python_dotenv-1.2.4.tar.gz", hash = "sha256:f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0", size = 60824, upload-time = "2026-10-01T05:36:10Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/17/c5c6b53ddc18f297992099b3d9ec16c855c0ccc83263a21fe4d1c625ec6c/python_dotenv-1.2.3-py3-none-any.whl", hash = "sha256:904552145e8bfed22162c09dab1c2b9b54fefa7b23ba780f4f26ca0316b0f0d9", size = 22780, upload-time = "2026-08-16T16:54:52.473Z" },
+    { url = "https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl", hash = "sha256:42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc", size = 23266, upload-time = "2026-10-01T05:36:08.633Z" },
 ]
 
 [[package]]
