@@ -8,6 +8,10 @@ auswertet und das Ergebnis als statische, durchsuchbare Webseite ablegt.
 - **Quellenpriorität:** Hersteller-Doku → Standards (NIST, BSI, OWASP) → CVE → Reputable Blogs.
 - **Aktualitätsprüfung:** `refresh` vergleicht ETag / Last-Modified / SHA-256 und re-recherchiert nur veränderte Themen.
 - **Stale-Banner:** Themen, die älter als 21 Tage sind, werden auf der Seite markiert.
+- **Wochen-Briefing:** `digest` scannt kuratierte RSS/Atom-Feeds (`researcher/feeds.json`)
+  und fasst die relevanten neuen Einträge der Woche zusammen.
+- **Intake über GitHub-Issues:** Neue Fragen, Archivierungen und Feed-Vorschläge lassen
+  sich direkt über Issue-Formulare auslösen (nur Repo-Owner).
 
 ---
 
@@ -64,10 +68,16 @@ researcher serve
 | `researcher refresh --topic <slug>` | Nur dieses Topic.                                                     |
 | `researcher refresh --force`      | Erzwingt Re-Recherche aller Topics.                                   |
 | `researcher refresh --min-stale 3 --min-age-days 14` | Schwellen für die Re-Recherche (Standardwerte). |
+| `researcher digest [--force]`     | Scannt die Feeds und erstellt das Wochen-Briefing (`--force`: bereits gesehene Einträge erneut verarbeiten). |
+| `researcher archive-topic <slug>` | Verschiebt ein Topic ins Archiv (keine Frische-Prüfung mehr, bleibt einsehbar). |
+| `researcher unarchive-topic <slug>` | Holt ein Topic aus dem Archiv zurück.                               |
+| `researcher add-feed --url <url> --name <name> [--category <kat>]` | Validiert einen RSS/Atom-Feed und ergänzt ihn in `feeds.json`. |
+| `researcher intake`               | Verarbeitet einen Issue-Intake (wird vom Workflow aufgerufen, liest `INTAKE_ACTION` / `ISSUE_BODY`). |
 | `researcher list`                 | Listet alle gespeicherten Topics.                                     |
 | `researcher serve [--port 8000]`  | Lokale HTTP-Vorschau aus `dist/`.                                     |
 | `researcher render-only`          | Rendert nur HTML neu (ohne Netzwerkzugriff).                          |
 | `researcher doctor`               | Prüft Keys + Erreichbarkeit der Quellen.                              |
+| `researcher init`                 | Legt die SQLite-DB an (passiert auch automatisch).                    |
 
 ### `ask.cmd` als globaler Befehl
 
@@ -85,6 +95,21 @@ Windows-PATH aufnehmen — z. B. via PowerShell:
 
 Neues Terminal öffnen → `ask "..."` ist jetzt von jedem Verzeichnis aus
 erreichbar.
+
+## Intake über GitHub-Issues
+
+Unter **Issues → New issue** stehen drei Formulare bereit
+(`.github/ISSUE_TEMPLATE/`):
+
+| Formular | Label | Wirkung |
+| --- | --- | --- |
+| Neue Recherche-Frage | `intake:ask` | Recherchiert die Frage und veröffentlicht das Ergebnis. |
+| Recherche archivieren | `intake:archive` | Archiviert das Topic mit dem angegebenen Slug. |
+| Feed vorschlagen | `intake:add-feed` | Validiert den Feed und nimmt ihn ins Wochen-Briefing auf. |
+
+Der Workflow `.github/workflows/intake.yml` verarbeitet das Issue, committet die
+Änderungen, deployt die Seite und kommentiert das Ergebnis im Issue. Issues von
+anderen Personen als dem Repo-Owner werden abgelehnt und geschlossen.
 
 ## Wie funktioniert die Aktualitätsprüfung?
 
@@ -129,70 +154,61 @@ researcher/
 ├── cli.py            # typer-CLI
 ├── agent.py          # Claude Agent SDK + Output-Parsing
 ├── mcp_config.py     # Brave + Microsoft Learn MCP-Server
+├── digest.py         # Wochen-Briefing aus den Feeds
+├── feeds.py          # Laden/Ergänzen der Feed-Liste
+├── feeds.json        # kuratierte RSS/Atom-Feeds
+├── intake.py         # Parser für GitHub-Issue-Formulare
 ├── prompts/
-│   └── system_prompt_de.md
+│   ├── system_prompt_de.md         # Recherche
+│   ├── system_prompt_digest_de.md  # Wochen-Briefing
+│   └── org_context_de.md           # Organisations-Kontext
 ├── sources.py        # ETag / Last-Modified / SHA-256
 ├── store.py          # SQLite
 ├── render.py         # Jinja2 → dist/
-├── templates/
+├── templates/        # base, index, topic, archive, weekly
 └── static/
+tests/                 # pytest-Suite
 data/
-├── researcher.sqlite
-└── cache/
+├── researcher.sqlite  # committed (Quell-Historie zwischen Workflow-Läufen)
+└── cache/             # lokal, nicht im Repo
 dist/                  # generierte statische Seite (deploy-ready)
+.github/
+├── workflows/         # pages.yml, intake.yml, tests.yml
+├── ISSUE_TEMPLATE/    # Intake-Formulare
+└── dependabot.yml     # wöchentliche Updates für uv + Actions
 ```
 
-## Migration zu GitHub Pages
+## Tests
 
-`dist/` ist bereits ein vollständiges statisches Bundle — kein Umbau nötig.
+```bash
+uv sync --extra dev
+uv run pytest -q
+```
 
-1. Repo auf GitHub anlegen, Code pushen (ohne `.env`, `data/cache/`).
+Der Workflow `tests.yml` führt die Suite bei jedem Push und Pull Request aus.
+
+## Deployment auf GitHub Pages
+
+`dist/` ist ein vollständiges statisches Bundle. Das Deployment übernimmt
+`.github/workflows/pages.yml` (jeden Montag 06:00 UTC sowie manuell auslösbar):
+
+1. `researcher refresh`: re-recherchiert veränderte Topics.
+2. `researcher digest`: erstellt das Wochen-Briefing (manuell mit Option *force*).
+3. Schlägt Refresh oder Digest fehl, wird trotzdem deployt, der Lauf zeigt dann
+   aber eine sichtbare Warnung an.
+4. Die aktualisierte `data/researcher.sqlite` wird zurück nach `main` committet.
+5. `dist/` wird auf GitHub Pages deployt; bei transienten Deploy-Fehlern wird der
+   Lauf automatisch bis zu dreimal wiederholt.
+
+Einrichtung für ein neues Repo:
+
+1. Code pushen (ohne `.env`, `data/cache/`).
 2. **Settings → Pages** auf "GitHub Actions" stellen.
 3. **Secrets:** `ANTHROPIC_API_KEY` und `BRAVE_API_KEY` als Repository-Secrets setzen.
-4. Beispiel-Workflow `.github/workflows/pages.yml`:
+4. In `intake.yml` ggf. `PAGES_BASE` auf die eigene Pages-URL anpassen.
 
-```yaml
-name: Build & Deploy
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * 1"   # jeden Montag 06:00 UTC
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v10.0.1
-        with: { python-version: "3.12" }
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
-      - run: uv sync --locked
-      - env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
-        run: uv run researcher refresh
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: dist }
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/deploy-pages@v4
-        id: deployment
-```
-
-> Für Pages-Deploys sollte `data/researcher.sqlite` ins Repo eingecheckt werden,
-> damit Quell-Historie und Frische-Stände zwischen Workflow-Läufen erhalten bleiben.
+> `data/researcher.sqlite` ist bewusst eingecheckt, damit Quell-Historie und
+> Frische-Stände zwischen Workflow-Läufen erhalten bleiben.
 
 ## Lizenz
 
